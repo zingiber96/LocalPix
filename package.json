@@ -2,13 +2,49 @@
   "name": "webpconvert",
   "version": "1.0.0",
   "description": "Local web app to convert PNG, JPEG, and SVG images to WebP",
-  "main": "server.js",
+  "main": "electron/main.js",
   "scripts": {
-    "start": "node server.js"
+    "start": "node server.js",
+    "app": "electron .",
+    "dist": "electron-builder --mac"
   },
   "dependencies": {
     "express": "^4.18.2",
-    "multer": "^1.4.5-lts.1",
+    "multer": "^2.1.1",
     "sharp": "^0.33.0"
+  },
+  "devDependencies": {
+    "electron": "^33.0.0",
+    "electron-builder": "^25.1.8"
+  },
+  "overrides": {
+    "picomatch": "^4.0.4"
+  },
+  "build": {
+    "appId": "com.local.webpconverter",
+    "productName": "WebP Converter",
+    "directories": {
+      "output": "release",
+      "buildResources": "build"
+    },
+    "files": [
+      "electron/**/*",
+      "server.js",
+      "public/**/*",
+      "package.json"
+    ],
+    "asarUnpack": [
+      "node_modules/sharp/**/*",
+      "node_modules/@img/**/*"
+    ],
+    "mac": {
+      "category": "public.app-category.utilities",
+      "target": [
+        "dmg",
+        "zip"
+      ],
+      "icon": "build/icon.png",
+      "identity": null
+    }
   }
 }

@@ -1,0 +1,10 @@
+services:
+  webp-converter:
+    build: .
+    container_name: webp-converter
+    ports:
+      - "3000:3000"
+    volumes:
+      # Persist converted files to ./output on the host
+      - ./output:/app/output
+    restart: unless-stopped
