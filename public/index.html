@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>WebP Converter</title>
+  <title>LocalConvert</title>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -83,7 +83,7 @@
     }
 
     .control-group {
-      flex: 1;
+      flex: 1 1 200px;
       min-width: 180px;
     }
 
@@ -116,7 +116,7 @@
       text-align: right;
     }
 
-    select {
+    select, input[type=number], input[type=color] {
       width: 100%;
       padding: 0.5rem 0.75rem;
       border: 1.5px solid #d2d2d7;
@@ -125,6 +125,43 @@
       background: #fff;
       color: #1d1d1f;
       cursor: pointer;
+    }
+
+    input[type=color] { padding: 0.2rem; height: 2.25rem; }
+
+    .checkbox-row {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.4rem 0;
+    }
+
+    .checkbox-row input { accent-color: #0071e3; }
+
+    .checklist {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.4rem 0.75rem;
+    }
+
+    .checklist label {
+      display: flex;
+      align-items: center;
+      gap: 0.3rem;
+      font-size: 0.85rem;
+      font-weight: 500;
+      color: #1d1d1f;
+      text-transform: none;
+      letter-spacing: 0;
+      margin: 0;
+      cursor: pointer;
+    }
+
+    .option-hint {
+      font-size: 0.8rem;
+      color: #6e6e73;
+      margin-top: 0.5rem;
+      font-style: italic;
     }
 
     .btn {
@@ -140,11 +177,7 @@
     .btn:active { transform: scale(0.97); }
     .btn:disabled { opacity: 0.4; cursor: not-allowed; }
 
-    .btn-primary {
-      background: #0071e3;
-      color: #fff;
-    }
-
+    .btn-primary { background: #0071e3; color: #fff; }
     .btn-primary:hover:not(:disabled) { background: #0077ed; }
 
     .btn-secondary {
@@ -153,10 +186,7 @@
       border: 1.5px solid #d2d2d7;
     }
 
-    .btn-sm {
-      padding: 0.35rem 0.85rem;
-      font-size: 0.82rem;
-    }
+    .btn-sm { padding: 0.35rem 0.85rem; font-size: 0.82rem; }
 
     .btn-danger {
       background: #fff0f0;
@@ -192,6 +222,20 @@
       display: block;
     }
 
+    .thumb-placeholder {
+      width: 64px;
+      height: 64px;
+      border-radius: 6px;
+      background: #e5e5ea;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.7rem;
+      font-weight: 700;
+      color: #8e8e93;
+      letter-spacing: 0.05em;
+    }
+
     .file-info { min-width: 0; }
 
     .file-name {
@@ -208,12 +252,17 @@
       margin-top: 0.2rem;
     }
 
-    .file-meta .savings {
-      color: #34c759;
-      font-weight: 600;
-    }
-
+    .file-meta .savings { color: #34c759; font-weight: 600; }
     .file-meta .error-msg { color: #ff3b30; }
+
+    .file-notices {
+      font-size: 0.75rem;
+      color: #a06800;
+      margin-top: 0.25rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.15rem;
+    }
 
     .file-actions {
       display: flex;
@@ -265,13 +314,30 @@
       color: #aeaeb2;
       font-size: 0.9rem;
     }
+
+    /* Options panel */
+    #options-panel {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 1.5rem;
+      align-items: flex-end;
+      flex: 2 1 100%;
+    }
+
+    .target-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 1.5rem;
+      align-items: flex-end;
+      margin-bottom: 1.25rem;
+    }
   </style>
 </head>
 <body>
 
 <header>
-  <h1>WebP Converter</h1>
-  <p>Convert PNG, JPEG &amp; SVG images to WebP — locally, offline, no upload.</p>
+  <h1>LocalConvert</h1>
+  <p>Convert images between formats — locally, offline, no upload.</p>
 </header>
 
 <!-- Drop zone -->
@@ -282,24 +348,45 @@
       <rect x="3" y="3" width="18" height="18" rx="3"/>
     </svg>
     <p><strong>Drag &amp; drop</strong> images here, or <strong>click to browse</strong></p>
-    <p style="margin-top:0.4rem;font-size:0.82rem;">PNG, JPEG, SVG &mdash; up to 100 MB each</p>
+    <p style="margin-top:0.4rem;font-size:0.82rem;">
+      JPEG, PNG, WebP, AVIF, GIF, HEIF/HEIC, TIFF, BMP, SVG, PSD &mdash; up to 100&nbsp;MB each
+    </p>
   </div>
-  <input type="file" id="file-input" multiple accept=".png,.jpg,.jpeg,.svg,image/png,image/jpeg,image/svg+xml" />
+  <input type="file" id="file-input" multiple
+    accept=".jpg,.jpeg,.png,.webp,.avif,.gif,.heic,.heif,.heics,.heifs,.tif,.tiff,.bmp,.svg,.psd,image/*" />
 </div>
 
 <!-- Controls -->
 <div class="card">
-  <div class="controls">
+  <div id="output-folder-row" style="display:flex;align-items:center;gap:0.75rem;margin-bottom:1.25rem;padding-bottom:1rem;border-bottom:1px solid #e5e5ea;flex-wrap:wrap;">
+    <label style="font-size:0.85rem;font-weight:600;color:#6e6e73;text-transform:uppercase;letter-spacing:0.04em;margin:0;">
+      Output folder
+    </label>
+    <code id="output-folder-path" title="" style="flex:1;min-width:0;font-size:0.82rem;color:#1d1d1f;background:#f5f5f7;padding:0.4rem 0.6rem;border-radius:6px;border:1px solid #e5e5ea;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">
+      …
+    </code>
+    <button class="btn btn-secondary btn-sm" id="change-folder-btn" style="display:none;">
+      Change…
+    </button>
+  </div>
+
+  <div class="target-row">
     <div class="control-group">
-      <label for="quality-slider">WebP Quality</label>
-      <div class="slider-row">
-        <input type="range" id="quality-slider" min="0" max="100" value="80" />
-        <span class="slider-value" id="quality-display">80</span>
-      </div>
+      <label for="target-format">Convert to</label>
+      <select id="target-format">
+        <option value="webp" selected>WebP</option>
+        <option value="jpeg">JPEG</option>
+        <option value="png">PNG</option>
+        <option value="avif">AVIF — modern, smallest files (slow encode)</option>
+        <option value="gif">GIF</option>
+        <option value="tiff">TIFF</option>
+        <option value="bmp">BMP</option>
+        <option value="ico">ICO</option>
+      </select>
     </div>
 
-    <div class="control-group" id="svg-density-group">
-      <label for="svg-density">SVG Resolution</label>
+    <div class="control-group" id="svg-density-group" style="display:none;">
+      <label for="svg-density">SVG Input Resolution</label>
       <select id="svg-density">
         <option value="96">1× (96 dpi)</option>
         <option value="192" selected>2× (192 dpi)</option>
@@ -307,11 +394,13 @@
       </select>
     </div>
 
-    <div style="display:flex;gap:0.5rem;align-items:flex-end;flex-wrap:wrap;">
+    <div style="display:flex;gap:0.5rem;align-items:flex-end;flex-wrap:wrap;margin-left:auto;">
       <button class="btn btn-primary" id="convert-all-btn" disabled>Convert All</button>
       <button class="btn btn-secondary btn-sm" id="clear-btn">Clear</button>
     </div>
   </div>
+
+  <div id="options-panel"></div>
 </div>
 
 <!-- File list -->
@@ -324,37 +413,152 @@
 </div>
 
 <script>
+  // ---------------------------------------------------------------------------
+  // Options config — drives the rendered options panel for each target format.
+  // To add a future output format: add an ENCODERS entry server-side AND a
+  // matching FORMAT_OPTIONS entry here. No other code change is required.
+  //
+  // Field types: slider, checkbox, select, number, checklist, color.
+  // showIf/hideIf receive the current opts object and return a boolean.
+  // ---------------------------------------------------------------------------
+  const FORMAT_OPTIONS = {
+    jpeg: {
+      label: 'JPEG',
+      fields: [
+        { key: 'quality', type: 'slider', min: 1, max: 100, def: 80, label: 'Quality' },
+        { key: 'progressive', type: 'checkbox', def: false, label: 'Progressive' },
+        // background is shown only when a source might have alpha — handled
+        // dynamically in renderOptions() so the field appears only when useful.
+      ],
+    },
+    png: {
+      label: 'PNG',
+      fields: [
+        { key: 'compressionLevel', type: 'slider', min: 0, max: 9, def: 6,
+          label: 'Compression effort (lossless)' },
+        { key: 'palette', type: 'checkbox', def: false, label: 'Reduce to 256-color palette' },
+      ],
+    },
+    webp: {
+      label: 'WebP',
+      fields: [
+        { key: 'lossless', type: 'checkbox', def: false, label: 'Lossless' },
+        { key: 'quality', type: 'slider', min: 1, max: 100, def: 80, label: 'Quality',
+          hideIf: (o) => o.lossless },
+        { key: 'effort', type: 'slider', min: 0, max: 6, def: 4, label: 'Effort' },
+      ],
+    },
+    avif: {
+      label: 'AVIF',
+      fields: [
+        { key: 'quality', type: 'slider', min: 1, max: 100, def: 50, label: 'Quality' },
+        { key: 'effort', type: 'slider', min: 0, max: 9, def: 4, label: 'Effort' },
+      ],
+    },
+    gif: {
+      label: 'GIF',
+      hint: 'GIF supports up to 256 colors. Photos may look posterized.',
+      fields: [
+        { key: 'colors', type: 'slider', min: 2, max: 256, def: 256, label: 'Colors' },
+        { key: 'loop', type: 'number', def: 0, min: 0,
+          label: 'Loop count (0 = infinite, animated only)' },
+      ],
+    },
+    tiff: {
+      label: 'TIFF',
+      fields: [
+        { key: 'compression', type: 'select', def: 'lzw', label: 'Compression',
+          opts: [
+            { value: 'lzw', label: 'LZW' },
+            { value: 'deflate', label: 'Deflate' },
+            { value: 'jpeg', label: 'JPEG' },
+            { value: 'none', label: 'None' },
+          ] },
+        { key: 'quality', type: 'slider', min: 1, max: 100, def: 80, label: 'Quality',
+          showIf: (o) => o.compression === 'jpeg' },
+      ],
+    },
+    bmp: {
+      label: 'BMP',
+      hint: 'BMP is uncompressed; expect large file sizes.',
+      fields: [],
+    },
+    ico: {
+      label: 'ICO',
+      fields: [
+        { key: 'sizes', type: 'checklist', def: [16, 32, 48], label: 'Sizes (px square)',
+          opts: [16, 32, 48, 64, 128, 256].map((n) => ({ value: n, label: `${n}` })) },
+      ],
+    },
+  };
+
+  // Source-kind detection mirrors the server's detectSourceKind() so the UI
+  // can show the right warnings without round-tripping.
+  function detectSourceKind(file) {
+    const ext = ('.' + (file.name.split('.').pop() || '')).toLowerCase();
+    const m = (file.type || '').toLowerCase();
+    if (ext === '.psd' || m.includes('photoshop')) return 'psd';
+    if (['.heic', '.heif', '.heics', '.heifs'].includes(ext) ||
+        m.startsWith('image/heic') || m.startsWith('image/heif')) return 'heif';
+    if (ext === '.svg' || m === 'image/svg+xml') return 'svg';
+    if (ext === '.bmp' || m === 'image/bmp') return 'bmp';
+    if (ext === '.gif' || m === 'image/gif') return 'gif';
+    if (ext === '.png' || m === 'image/png') return 'png';
+    if (ext === '.webp' || m === 'image/webp') return 'webp';
+    if (ext === '.avif' || m === 'image/avif') return 'avif';
+    if (['.tif', '.tiff'].includes(ext) || m === 'image/tiff') return 'tiff';
+    if (['.jpg', '.jpeg'].includes(ext) || m === 'image/jpeg' || m === 'image/jpg') return 'jpeg';
+    return 'unknown';
+  }
+
+  const SOURCE_KINDS_WITH_POSSIBLE_ALPHA = new Set(
+    ['png', 'webp', 'gif', 'svg', 'tiff', 'psd', 'heif', 'avif']
+  );
+  const RASTER_SOURCE_KINDS = new Set(
+    ['png', 'jpeg', 'webp', 'avif', 'gif', 'heif', 'tiff', 'bmp', 'psd']
+  );
+
+  // Per-file state. id -> { file, kind, rowEl, state, naturalW, naturalH }.
+  const files = new Map();
+  let nextId = 0;
+
+  // Current target format + options (global for v1 — per-file overrides are a
+  // v1.1 candidate; see server.js for the matching decision note).
+  let currentTarget = 'webp';
+  let currentOpts = defaultsFor('webp');
+  let currentBackground = '#ffffff';
+
   const dropZone = document.getElementById('drop-zone');
   const fileInput = document.getElementById('file-input');
-  const qualitySlider = document.getElementById('quality-slider');
-  const qualityDisplay = document.getElementById('quality-display');
+  const targetSelect = document.getElementById('target-format');
+  const optionsPanel = document.getElementById('options-panel');
   const convertAllBtn = document.getElementById('convert-all-btn');
   const clearBtn = document.getElementById('clear-btn');
   const fileList = document.getElementById('file-list');
   const emptyState = document.getElementById('empty-state');
   const batchBar = document.getElementById('batch-bar');
   const fileCount = document.getElementById('file-count');
+  const svgDensityGroup = document.getElementById('svg-density-group');
+  const svgDensity = document.getElementById('svg-density');
 
-  // Map: id -> { file, rowEl, state }
-  const files = new Map();
-  let nextId = 0;
-
-  qualitySlider.addEventListener('input', () => {
-    qualityDisplay.textContent = qualitySlider.value;
+  targetSelect.addEventListener('change', () => {
+    currentTarget = targetSelect.value;
+    currentOpts = defaultsFor(currentTarget);
+    renderOptions();
+    refreshFileNotices();
   });
 
-  // Drop zone interaction
   dropZone.addEventListener('click', () => fileInput.click());
-  dropZone.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') fileInput.click(); });
-
-  dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('dragover'); });
+  dropZone.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' || e.key === ' ') fileInput.click();
+  });
+  dropZone.addEventListener('dragover', (e) => { e.preventDefault(); dropZone.classList.add('dragover'); });
   dropZone.addEventListener('dragleave', () => dropZone.classList.remove('dragover'));
-  dropZone.addEventListener('drop', e => {
+  dropZone.addEventListener('drop', (e) => {
     e.preventDefault();
     dropZone.classList.remove('dragover');
     addFiles([...e.dataTransfer.files]);
   });
-
   fileInput.addEventListener('change', () => {
     addFiles([...fileInput.files]);
     fileInput.value = '';
@@ -363,43 +567,186 @@
   convertAllBtn.addEventListener('click', () => convertAll());
   clearBtn.addEventListener('click', () => clearAll());
 
-  function addFiles(newFiles) {
-    const accepted = newFiles.filter(f =>
-      ['image/png', 'image/jpeg', 'image/jpg', 'image/svg+xml'].includes(f.type)
-    );
+  function defaultsFor(format) {
+    const out = {};
+    const conf = FORMAT_OPTIONS[format];
+    if (!conf) return out;
+    for (const f of conf.fields) {
+      out[f.key] = Array.isArray(f.def) ? [...f.def] : f.def;
+    }
+    return out;
+  }
 
-    if (accepted.length < newFiles.length) {
-      const skipped = newFiles.length - accepted.length;
-      alert(`${skipped} file(s) skipped — only PNG, JPEG, and SVG are supported.`);
+  // Render the options panel based on the current target and known sources.
+  function renderOptions() {
+    const conf = FORMAT_OPTIONS[currentTarget];
+    optionsPanel.innerHTML = '';
+    if (!conf) return;
+
+    const fields = [...conf.fields];
+
+    // JPEG: append a background color picker when any source might be
+    // transparent. The actual flatten happens server-side; the UI proactively
+    // exposes the control so the user can pick a fill before converting.
+    if (currentTarget === 'jpeg' && anySourceMayHaveAlpha()) {
+      fields.push({ key: 'background', type: 'color', def: '#ffffff',
+        label: 'Background (for transparent sources)' });
     }
 
-    accepted.forEach(file => {
-      const id = nextId++;
-      const row = createRow(id, file);
-      files.set(id, { file, rowEl: row, state: 'pending' });
-      fileList.appendChild(row);
-      generateThumb(id, file);
-    });
+    for (const f of fields) {
+      if (f.showIf && !f.showIf(currentOpts)) continue;
+      if (f.hideIf && f.hideIf(currentOpts)) continue;
+      optionsPanel.appendChild(renderField(f));
+    }
 
+    if (conf.hint) {
+      const hint = document.createElement('div');
+      hint.className = 'option-hint';
+      hint.style.flex = '1 1 100%';
+      hint.textContent = conf.hint;
+      optionsPanel.appendChild(hint);
+    }
+  }
+
+  function renderField(f) {
+    const wrap = document.createElement('div');
+    wrap.className = 'control-group';
+
+    if (f.type === 'slider') {
+      const val = currentOpts[f.key] ?? f.def;
+      wrap.innerHTML = `
+        <label>${escHtml(f.label)}</label>
+        <div class="slider-row">
+          <input type="range" min="${f.min}" max="${f.max}" value="${val}" />
+          <span class="slider-value">${val}</span>
+        </div>`;
+      const range = wrap.querySelector('input');
+      const display = wrap.querySelector('.slider-value');
+      range.addEventListener('input', () => {
+        currentOpts[f.key] = Number(range.value);
+        display.textContent = range.value;
+      });
+    } else if (f.type === 'checkbox') {
+      const checked = currentOpts[f.key] ?? f.def;
+      wrap.innerHTML = `
+        <label>&nbsp;</label>
+        <div class="checkbox-row">
+          <input type="checkbox" ${checked ? 'checked' : ''} id="cb-${f.key}" />
+          <label for="cb-${f.key}" style="margin:0;text-transform:none;letter-spacing:0;font-weight:500;color:#1d1d1f;">
+            ${escHtml(f.label)}
+          </label>
+        </div>`;
+      const cb = wrap.querySelector('input');
+      cb.addEventListener('change', () => {
+        currentOpts[f.key] = cb.checked;
+        renderOptions(); // re-render so show/hide rules apply (e.g. webp lossless)
+      });
+    } else if (f.type === 'select') {
+      wrap.innerHTML = `
+        <label>${escHtml(f.label)}</label>
+        <select>
+          ${f.opts.map((o) =>
+            `<option value="${escHtml(o.value)}" ${currentOpts[f.key] === o.value ? 'selected' : ''}>
+              ${escHtml(o.label)}
+            </option>`).join('')}
+        </select>`;
+      const sel = wrap.querySelector('select');
+      sel.addEventListener('change', () => {
+        currentOpts[f.key] = sel.value;
+        renderOptions();
+      });
+    } else if (f.type === 'number') {
+      wrap.innerHTML = `
+        <label>${escHtml(f.label)}</label>
+        <input type="number" min="${f.min ?? ''}" value="${currentOpts[f.key] ?? f.def}" />`;
+      const num = wrap.querySelector('input');
+      num.addEventListener('input', () => {
+        currentOpts[f.key] = Number(num.value);
+      });
+    } else if (f.type === 'color') {
+      wrap.innerHTML = `
+        <label>${escHtml(f.label)}</label>
+        <input type="color" value="${currentBackground}" />`;
+      const c = wrap.querySelector('input');
+      c.addEventListener('input', () => {
+        currentBackground = c.value;
+        currentOpts.background = c.value;
+      });
+      currentOpts.background = currentBackground;
+    } else if (f.type === 'checklist') {
+      const selected = new Set(currentOpts[f.key] ?? f.def);
+      wrap.innerHTML = `
+        <label>${escHtml(f.label)}</label>
+        <div class="checklist">
+          ${f.opts.map((o) => `
+            <label>
+              <input type="checkbox" value="${o.value}" ${selected.has(o.value) ? 'checked' : ''} />
+              ${escHtml(o.label)}
+            </label>`).join('')}
+        </div>`;
+      wrap.querySelectorAll('input').forEach((cb) => {
+        cb.addEventListener('change', () => {
+          const checked = [...wrap.querySelectorAll('input:checked')]
+            .map((x) => Number(x.value));
+          currentOpts[f.key] = checked;
+        });
+      });
+    }
+
+    return wrap;
+  }
+
+  function anySourceMayHaveAlpha() {
+    for (const { kind } of files.values()) {
+      if (SOURCE_KINDS_WITH_POSSIBLE_ALPHA.has(kind)) return true;
+    }
+    return false;
+  }
+
+  function addFiles(newFiles) {
+    const accepted = [];
+    const rejected = [];
+    for (const f of newFiles) {
+      const kind = detectSourceKind(f);
+      if (kind === 'unknown') rejected.push(f.name);
+      else accepted.push({ file: f, kind });
+    }
+    if (rejected.length) {
+      alert(
+        `${rejected.length} file(s) skipped (unsupported type):\n` +
+        rejected.slice(0, 5).join('\n') +
+        (rejected.length > 5 ? `\n…and ${rejected.length - 5} more` : '')
+      );
+    }
+    for (const { file, kind } of accepted) {
+      const id = nextId++;
+      const rowEl = createRow(id, file, kind);
+      files.set(id, { file, kind, rowEl, state: 'pending', naturalW: 0, naturalH: 0 });
+      fileList.appendChild(rowEl);
+      generateThumb(id, file, kind);
+    }
     refresh();
   }
 
-  function createRow(id, file) {
+  function createRow(id, file, kind) {
     const row = document.createElement('div');
     row.className = 'file-row';
     row.dataset.id = id;
 
-    const isSvg = file.type === 'image/svg+xml';
     const sizeStr = formatSize(file.size);
+    const kindLabel = kind.toUpperCase();
 
     row.innerHTML = `
-      <img class="thumb" alt="preview" />
+      <div class="thumb-wrap"></div>
       <div class="file-info">
         <div class="file-name" title="${escHtml(file.name)}">${escHtml(file.name)}</div>
         <div class="file-meta">
+          <span class="kind-label">${escHtml(kindLabel)}</span>
+          &middot;
           <span class="original-size">${sizeStr}</span>
           <span class="result-info"></span>
         </div>
+        <div class="file-notices"></div>
       </div>
       <div class="file-actions">
         <div class="spinner"></div>
@@ -415,14 +762,68 @@
     return row;
   }
 
-  function generateThumb(id, file) {
+  function generateThumb(id, file, kind) {
     const entry = files.get(id);
     if (!entry) return;
-    const img = entry.rowEl.querySelector('.thumb');
+    const wrap = entry.rowEl.querySelector('.thumb-wrap');
+
+    // Browsers can't render PSD / HEIF natively → show a labelled placeholder.
+    const browserSupportsThumb = !['psd', 'heif', 'tiff', 'bmp'].includes(kind);
+    if (!browserSupportsThumb) {
+      const placeholder = document.createElement('div');
+      placeholder.className = 'thumb-placeholder';
+      placeholder.textContent = kind.toUpperCase();
+      wrap.appendChild(placeholder);
+      return;
+    }
+
+    const img = document.createElement('img');
+    img.className = 'thumb';
+    img.alt = 'preview';
     const url = URL.createObjectURL(file);
     img.src = url;
-    img.onload = () => URL.revokeObjectURL(url);
-    img.onerror = () => { img.style.background = '#e5e5ea'; };
+    img.onload = () => {
+      entry.naturalW = img.naturalWidth;
+      entry.naturalH = img.naturalHeight;
+      URL.revokeObjectURL(url);
+      refreshFileNotices(); // ICO non-square notice needs real dimensions.
+    };
+    img.onerror = () => {
+      const placeholder = document.createElement('div');
+      placeholder.className = 'thumb-placeholder';
+      placeholder.textContent = kind.toUpperCase();
+      wrap.innerHTML = '';
+      wrap.appendChild(placeholder);
+    };
+    wrap.appendChild(img);
+  }
+
+  // Per-row notices update when the target format or known source dims change.
+  function refreshFileNotices() {
+    for (const { file, kind, rowEl, naturalW, naturalH } of files.values()) {
+      const slot = rowEl.querySelector('.file-notices');
+      const notices = [];
+
+      if (currentTarget === 'jpeg' && SOURCE_KINDS_WITH_POSSIBLE_ALPHA.has(kind)) {
+        notices.push('Source may have transparency — will be flattened onto the background color for JPEG output.');
+      }
+      if (currentTarget === 'ico' && naturalW > 0 && naturalW !== naturalH) {
+        notices.push(`Source is ${naturalW}×${naturalH} (not square). Will be padded with transparency.`);
+      }
+      if (kind === 'psd') {
+        notices.push('PSD imported as a flattened composite. Layers and effects are not preserved.');
+      }
+      if (kind === 'heif') {
+        notices.push('HEIF/HEIC input: decoded locally; no HEIC encoder is shipped (use AVIF for similar compression).');
+      }
+      if ((kind === 'gif' || kind === 'webp') && currentTarget !== kind) {
+        // Light hint — only show if it's a different target so we don't pester
+        // users converting a GIF to a GIF, etc.
+        notices.push('Animated sources are flattened to the first frame in v1.');
+      }
+
+      slot.innerHTML = notices.map((n) => `• ${escHtml(n)}`).join('<br>');
+    }
   }
 
   async function convertFile(id) {
@@ -436,18 +837,17 @@
     const convertBtn = row.querySelector('.convert-btn');
     convertBtn.disabled = true;
 
-    const quality = qualitySlider.value;
-    const density = document.getElementById('svg-density').value;
-
     const formData = new FormData();
     formData.append('image', entry.file);
-    formData.append('quality', quality);
-    formData.append('density', density);
+    formData.append('targetFormat', currentTarget);
+    formData.append('options', JSON.stringify(currentOpts));
+    if (entry.kind === 'svg') {
+      formData.append('inputDensity', svgDensity.value);
+    }
 
     try {
       const resp = await fetch('/api/convert', { method: 'POST', body: formData });
       const data = await resp.json();
-
       if (!resp.ok) throw new Error(data.error || 'Conversion failed');
 
       entry.state = 'done';
@@ -467,9 +867,9 @@
         ` → ${formatSize(data.convertedSize)} &nbsp;${savingsStr}`;
 
       const wrap = row.querySelector('.download-wrap');
-      wrap.innerHTML = `<a class="download-link" href="/api/download/${encodeURIComponent(data.convertedName)}" download="${escHtml(data.convertedName)}">
-        ⬇ Download
-      </a>`;
+      wrap.innerHTML = `<a class="download-link"
+        href="/api/download/${encodeURIComponent(data.convertedName)}"
+        download="${escHtml(data.convertedName)}">⬇ Download</a>`;
 
       convertBtn.textContent = 'Reconvert';
       convertBtn.disabled = false;
@@ -513,9 +913,12 @@
     fileCount.textContent = `${count} file${count !== 1 ? 's' : ''}`;
     convertAllBtn.disabled = count === 0;
 
-    // Show SVG density control only when SVG files are present
-    const hasSvg = [...files.values()].some(e => e.file.type === 'image/svg+xml');
-    document.getElementById('svg-density-group').style.display = hasSvg ? '' : 'none';
+    // SVG density only visible when an SVG file is in the list.
+    const hasSvg = [...files.values()].some((e) => e.kind === 'svg');
+    svgDensityGroup.style.display = hasSvg ? '' : 'none';
+
+    renderOptions(); // re-render in case alpha-source state changed
+    refreshFileNotices();
   }
 
   function formatSize(bytes) {
@@ -532,7 +935,47 @@
       .replace(/"/g, '&quot;');
   }
 
-  // Initial state
+  // -- Output folder display + Electron folder picker ------------------------
+  // Web/Docker mode: shows the absolute server-side ./output/ path read-only.
+  // Electron mode (window.localconvert exists via preload): shows the current
+  // folder and exposes a "Change…" button that triggers the native picker.
+  const outputFolderPathEl = document.getElementById('output-folder-path');
+  const changeFolderBtn = document.getElementById('change-folder-btn');
+
+  function setOutputFolderDisplay(path) {
+    outputFolderPathEl.textContent = path || '(unknown)';
+    outputFolderPathEl.title = path || '';
+  }
+
+  (async function initOutputFolder() {
+    try {
+      const resp = await fetch('/api/config');
+      const cfg = await resp.json();
+      setOutputFolderDisplay(cfg.outputDir);
+      if (window.localconvert && cfg.electron) {
+        changeFolderBtn.style.display = '';
+      }
+    } catch (e) {
+      // Non-fatal — keep the placeholder.
+    }
+
+    if (window.localconvert) {
+      changeFolderBtn.addEventListener('click', async () => {
+        try {
+          const newPath = await window.localconvert.selectOutputFolder();
+          if (newPath) setOutputFolderDisplay(newPath);
+        } catch (e) {
+          alert(`Could not change output folder: ${e.message}`);
+        }
+      });
+      // Also listen for changes triggered from the menu (⌘⇧O) so the UI stays
+      // in sync without the user having to click the in-window button.
+      window.localconvert.onOutputFolderChanged?.((p) => setOutputFolderDisplay(p));
+    }
+  })();
+
+  // Initial render
+  renderOptions();
   refresh();
 </script>
 </body>
