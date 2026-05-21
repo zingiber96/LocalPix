@@ -1,4 +1,4 @@
-// LocalConvert — local, offline, multi-format image converter.
+// LocalPix — local, offline, multi-format image converter.
 // Single Express server: serves the static frontend and exposes one
 // conversion endpoint that dispatches by target format.
 
@@ -44,15 +44,17 @@ agPsd.initializeCanvas(
 
 // Output dir and port are configurable so the same server can run as a
 // standalone process (`npm start`) or be embedded in the Electron app.
-// WEBP_OUTPUT_DIR is still honoured for backwards-compatibility with users
-// who set it under the old name.
+// LOCALCONVERT_OUTPUT_DIR is honoured as a one-version-back fallback so
+// users who set the env var under the previous app name don't lose their
+// configuration on upgrade. The WEBP_OUTPUT_DIR env from the original
+// WEBPConvert release is no longer recognized (two renames is enough).
 //
 // outputDir is mutable at runtime so the Electron host can update it when
 // the user picks a new folder via the native dialog. Web/Docker mode reads
 // the env var at startup and never reassigns.
 let outputDir =
+  process.env.LOCALPIX_OUTPUT_DIR ||
   process.env.LOCALCONVERT_OUTPUT_DIR ||
-  process.env.WEBP_OUTPUT_DIR ||
   path.join(__dirname, 'output');
 const DEFAULT_PORT = parseInt(process.env.PORT, 10) || 3000;
 
@@ -264,7 +266,8 @@ const ENCODERS = {
       const quality = clamp(opts.quality, 1, 100, 80);
       const effort = clamp(opts.effort, 0, 6, 4);
       // alphaQuality is fixed at 100 (not exposed in UI) to preserve
-      // byte-identical output with the pre-LocalConvert WebP defaults.
+      // byte-identical output with the pre-LocalConvert WebP defaults
+      // (which were inherited unchanged by LocalConvert and now LocalPix).
       return pipeline.webp({ quality, lossless, effort, alphaQuality: 100 }).toBuffer();
     },
   },
@@ -389,7 +392,7 @@ function createApp() {
       // No way to tell from inside the server alone, but the Electron host
       // sets this env var when it embeds us. The frontend uses this to decide
       // whether to show the "Change…" button.
-      electron: !!process.env.LOCALCONVERT_ELECTRON,
+      electron: !!process.env.LOCALPIX_ELECTRON,
     });
   });
 
@@ -482,6 +485,6 @@ module.exports = { createApp, startServer, getOutputDir, setOutputDir };
 // Run directly (`node server.js` / `npm start`) — keep CLI behaviour.
 if (require.main === module) {
   startServer().then(({ port }) => {
-    console.log(`\n  LocalConvert running at http://localhost:${port}\n`);
+    console.log(`\n  LocalPix running at http://localhost:${port}\n`);
   });
 }

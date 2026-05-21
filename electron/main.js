@@ -5,12 +5,29 @@ const fs = require('fs');
 // Mark ourselves to the embedded server so /api/config can tell the frontend
 // it's running inside the desktop app (controls whether the "Change…" button
 // appears next to the output folder).
-process.env.LOCALCONVERT_ELECTRON = '1';
+process.env.LOCALPIX_ELECTRON = '1';
 
 // Persisted settings live in the OS-standard userData folder:
-//   macOS:   ~/Library/Application Support/LocalConvert/config.json
-//   Windows: %APPDATA%/LocalConvert/config.json
+//   macOS:   ~/Library/Application Support/LocalPix/config.json
+//   Windows: %APPDATA%/LocalPix/config.json
+// (Electron derives the folder name from package.json's productName.)
 const configPath = path.join(app.getPath('userData'), 'config.json');
+
+// One-time migration from the previous app name. The 'appData' base is the
+// parent of userData, so we can construct the old LocalConvert path directly.
+// We *copy* (not move) so users who downgrade still have their old config,
+// and we only copy when the new path is empty — preserving any new edits.
+(function migrateLegacyConfig() {
+  if (fs.existsSync(configPath)) return;
+  const legacyPath = path.join(app.getPath('appData'), 'LocalConvert', 'config.json');
+  if (!fs.existsSync(legacyPath)) return;
+  try {
+    fs.mkdirSync(path.dirname(configPath), { recursive: true });
+    fs.copyFileSync(legacyPath, configPath);
+  } catch (e) {
+    // Non-fatal — user will just see the default folder on first launch.
+  }
+})();
 
 function readConfig() {
   try {
@@ -31,9 +48,10 @@ function writeConfig(cfg) {
 }
 
 // Default output folder if the user has never picked one. Goes into the
-// system Downloads folder under a subfolder named after the app, so users
-// can find their conversions without hunting for them.
-const defaultOutputDir = path.join(app.getPath('downloads'), 'LocalConvert');
+// system Documents folder under a subfolder named after the app — Documents
+// is the more natural home for image outputs the user expects to keep, vs.
+// Downloads which most people treat as a transient inbox.
+const defaultOutputDir = path.join(app.getPath('documents'), 'LocalPix');
 
 // Pick the initial output folder: persisted choice if it still exists and is
 // writable; otherwise fall back to the default. We don't error on a missing
@@ -56,7 +74,7 @@ function resolveInitialOutputDir() {
 // The server reads this env var at startup, so we must set it BEFORE
 // requiring server.js. setOutputDir() (exposed below via IPC) handles
 // runtime changes after this.
-process.env.LOCALCONVERT_OUTPUT_DIR = resolveInitialOutputDir();
+process.env.LOCALPIX_OUTPUT_DIR = resolveInitialOutputDir();
 
 const { startServer, getOutputDir, setOutputDir } = require('../server');
 
@@ -109,7 +127,7 @@ async function pickOutputFolder() {
   } catch (e) {
     dialog.showErrorBox(
       'Cannot use that folder',
-      `LocalConvert could not write to:\n${chosen}\n\n${e.message}`
+      `LocalPix could not write to:\n${chosen}\n\n${e.message}`
     );
     return null;
   }
@@ -118,15 +136,17 @@ async function pickOutputFolder() {
 
   // Tell the renderer so it can update the displayed path live.
   if (mainWindow && !mainWindow.isDestroyed()) {
-    mainWindow.webContents.send('output-folder-changed', chosen);
+    mainWindow.webContents.send('localpix:output-folder-changed', chosen);
   }
 
   return chosen;
 }
 
-// IPC handlers exposed via the preload script's contextBridge.
-ipcMain.handle('get-output-folder', () => getOutputDir());
-ipcMain.handle('select-output-folder', () => pickOutputFolder());
+// IPC handlers exposed via the preload script's contextBridge. Channel names
+// are prefixed with 'localpix:' so they don't collide with channels from
+// other Electron apps if anything ever inspects them globally.
+ipcMain.handle('localpix:get-output-folder', () => getOutputDir());
+ipcMain.handle('localpix:select-output-folder', () => pickOutputFolder());
 
 function createWindow() {
   mainWindow = new BrowserWindow({
@@ -134,7 +154,7 @@ function createWindow() {
     height: 800,
     minWidth: 600,
     minHeight: 500,
-    title: 'LocalConvert',
+    title: 'LocalPix',
     backgroundColor: '#f5f5f7',
     webPreferences: {
       // The UI is fully local and trusted, but we still keep Node out of the
@@ -157,7 +177,7 @@ app.whenReady().then(async () => {
     serverInfo = await startServer(0); // 0 = OS-assigned free port
   } catch (err) {
     dialog.showErrorBox(
-      'LocalConvert failed to start',
+      'LocalPix failed to start',
       `Could not start the local conversion server.\n\n${err.message}`
     );
     app.quit();

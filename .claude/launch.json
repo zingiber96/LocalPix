@@ -2,13 +2,13 @@
   "version": "0.0.1",
   "configurations": [
     {
-      "name": "localconvert",
+      "name": "localpix",
       "runtimeExecutable": "npm",
       "runtimeArgs": ["start"],
       "port": 3000
     },
     {
-      "name": "localconvert-docker",
+      "name": "localpix-docker",
       "runtimeExecutable": "docker",
       "runtimeArgs": ["compose", "up", "--build"],
       "port": 3000
