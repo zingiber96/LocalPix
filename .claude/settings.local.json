@@ -1,0 +1,18 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git log *)",
+      "Bash(git lfs *)",
+      "Bash(git diff *)",
+      "Bash(git config *)",
+      "Bash(git checkout *)",
+      "Bash(git pull *)",
+      "Bash(git rm *)",
+      "Bash(git add *)",
+      "Bash(git commit --quiet -m 'Stop tracking build output \\(release/\\); add to .gitignore *)",
+      "Bash(git merge *)",
+      "Bash(git commit *)",
+      "Bash(git stash *)"
+    ]
+  }
+}
