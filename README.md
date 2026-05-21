@@ -1,4 +1,4 @@
-# LocalConvert
+# LocalPix
 
 A local, offline image converter. Batch-convert between JPEG, PNG, WebP,
 AVIF, GIF, TIFF, BMP and ICO — and read HEIC, SVG and PSD as inputs. No
@@ -28,8 +28,9 @@ A standalone macOS app — no Node, npm, or Docker needed by the end user.
 **Install:** open the DMG in `release/` and drag the app to Applications, then
 double-click it like any other app.
 
-Converted files are saved to **`~/Downloads/LocalConvert/`**. Use the
-**Output → Open Output Folder** menu item (⌘O) to jump there.
+Converted files are saved to **`~/Documents/LocalPix/`** by default — use
+**Output → Change Output Folder…** (⌘⇧O) to pick anywhere else. Open the
+current folder with **Output → Open Output Folder** (⌘O).
 
 ### Building the app from source
 
@@ -41,7 +42,7 @@ npm run dist         # build release/*.dmg, *.zip and the .app bundle
 
 > The build is unsigned (`identity: null`). On first launch macOS Gatekeeper
 > may warn — right-click the app → **Open**, or run
-> `xattr -dr com.apple.quarantine "LocalConvert.app"`.
+> `xattr -dr com.apple.quarantine "LocalPix.app"`.
 
 ## Run with Docker (standalone)
 
@@ -52,8 +53,8 @@ No Node install needed — just Docker.
 docker compose up --build
 
 # …or with plain Docker
-docker build -t localconvert .
-docker run -p 3000:3000 -v "$(pwd)/output:/app/output" localconvert
+docker build -t localpix .
+docker run -p 3000:3000 -v "$(pwd)/output:/app/output" localpix
 ```
 
 Open **http://localhost:3000**. Converted files are written to the host

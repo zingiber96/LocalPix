@@ -1,5 +1,5 @@
 {
-  "name": "localconvert",
+  "name": "localpix",
   "version": "1.0.0",
   "description": "Local, offline image converter — batch-convert between JPEG, PNG, WebP, AVIF, GIF, TIFF, BMP, ICO and more.",
   "main": "electron/main.js",
@@ -24,8 +24,8 @@
     "picomatch": "^4.0.4"
   },
   "build": {
-    "appId": "com.local.localconvert",
-    "productName": "LocalConvert",
+    "appId": "com.local.localpix",
+    "productName": "LocalPix",
     "directories": {
       "output": "release",
       "buildResources": "build"
@@ -47,8 +47,15 @@
         "dmg",
         "zip"
       ],
-      "icon": "build/icon.png",
+      "icon": "build/icon.icns",
       "identity": null
+    },
+    "win": {
+      "target": [
+        "nsis",
+        "zip"
+      ],
+      "icon": "build/icon.png"
     }
   }
 }
