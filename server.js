@@ -7,40 +7,7 @@ const multer = require('multer');
 const sharp = require('sharp');
 const path = require('path');
 const fs = require('fs');
-const bmpJs = require('bmp-js');
-const agPsd = require('ag-psd');
-const heicDecode = require('heic-decode');
-
-// ag-psd in Node has no HTMLCanvasElement to fall back on. Rather than pull
-// in node-canvas (heavy native dep: Cairo, Pango, libjpeg...), inject a
-// minimal Node-compatible polyfill. Only createImageData() is actually hit
-// by our composite-only PSD path (skipLayerImageData + skipThumbnail), but
-// the other two are provided as safety stubs in case ag-psd's internals call
-// them on an unexpected code path.
-agPsd.initializeCanvas(
-  function createCanvas(width, height) {
-    const buf = new Uint8ClampedArray(width * height * 4);
-    return {
-      width,
-      height,
-      getContext() {
-        return {
-          createImageData: (w, h) => ({ width: w, height: h, data: new Uint8ClampedArray(w * h * 4) }),
-          getImageData: (x, y, w, h) => ({ width: w, height: h, data: buf.slice() }),
-          putImageData: () => {},
-          drawImage: () => {},
-        };
-      },
-    };
-  },
-  function createCanvasFromData(/* data */) {
-    // Only hit when reading embedded thumbnails (we pass skipThumbnail: true).
-    return null;
-  },
-  function createImageData(width, height) {
-    return { width, height, data: new Uint8ClampedArray(width * height * 4) };
-  }
-);
+const magick = require('./lib/magick');
 
 // Output dir and port are configurable so the same server can run as a
 // standalone process (`npm start`) or be embedded in the Electron app.
@@ -82,21 +49,20 @@ function setOutputDir(newDir) {
 // Symmetric: also writable. Asymmetric inputs (SVG, PSD, HEIF) are documented
 // in the README and excluded from the output dispatch table below.
 //
-// HEIF note: we accept .heic/.heif files (HEVC-in-HEIF). Decode is attempted
-// via sharp's bundled libheif first; if that build can't decode HEVC, we fall
-// back to heic-decode (pure-JS via libde265-WASM) so distribution stays simple.
-// We do NOT encode HEIF/HEIC because that requires shipping an HEVC encoder
-// (x265) whose patent-pool licensing is incompatible with an open-source
-// release. AVIF (HEIF container + royalty-free AV1) covers the same need on
-// the output side. Revisit if licensing changes.
+// Decode strategy: sharp handles the formats its prebuilt libvips reads
+// natively (JPEG/PNG/WebP/AVIF/GIF/TIFF — see SHARP_NATIVE_SOURCES below).
+// Everything else (HEIF, PSD, BMP, and any future addition like JXL/JP2/EXR/
+// RAW) is routed through magick-wasm (lib/magick.js), which decodes to raw
+// RGBA that we hand back to sharp for the rest of the pipeline. This unifies
+// what used to be four bespoke decoder libraries (ag-psd, heic-decode,
+// libheif-js, bmp-js) into one consistent code path.
 //
-// PSD note: sharp's prebuilt libvips does not include the ImageMagick delegate,
-// so PSD is decoded JS-side via ag-psd (flattened composite — layers are not
-// preserved).
-//
-// BMP note: same magick-delegate limitation, so BMP input is decoded via
-// bmp-js (and BMP output is also encoded via bmp-js since sharp can't write
-// BMP either).
+// HEIF policy: we accept .heic/.heif (HEVC-in-HEIF) as input. We do NOT
+// encode HEIF/HEIC because that requires shipping an HEVC encoder (x265)
+// whose patent-pool licensing is incompatible with an open-source release.
+// AVIF — same HEIF container with the royalty-free AV1 codec — covers the
+// "modern, highly compressed" use case on the output side. magick-wasm's
+// build also excludes HEVC encoding for the same reason.
 const INPUT_MIMES = new Set([
   'image/jpeg', 'image/jpg', 'image/png', 'image/webp', 'image/avif',
   'image/gif',
@@ -148,50 +114,33 @@ function detectSourceKind(file) {
   return 'unknown';
 }
 
-// Build a sharp pipeline from the uploaded buffer, routing through JS-side
-// decoders for formats sharp's prebuilt libvips can't read.
+// Source kinds that sharp's prebuilt libvips decodes natively. Anything not
+// in this set (plus SVG, which has its own density-aware path) is routed
+// through magick-wasm. Keeping this small and explicit means the WebP
+// byte-identical guarantee — which depends on staying inside the sharp
+// pipeline for the hot path — is enforced structurally, not by accident.
+const SHARP_NATIVE_SOURCES = new Set([
+  'jpeg', 'png', 'webp', 'avif', 'gif', 'tiff',
+]);
+
+// Build a sharp pipeline from the uploaded buffer. SVG keeps its density-
+// aware decode; sharp-native formats pass through unchanged; everything else
+// is decoded by magick-wasm to raw RGBA and re-entered into sharp's pipeline.
 async function buildSourcePipeline(file, sourceKind, { density }) {
   if (sourceKind === 'svg') {
     return sharp(file.buffer, { density });
   }
 
-  if (sourceKind === 'psd') {
-    const psd = agPsd.readPsd(file.buffer, {
-      skipLayerImageData: true,
-      skipThumbnail: true,
-      useImageData: true,
-    });
-    if (!psd.imageData) throw new Error('PSD has no composite image to convert.');
-    const { width, height, data } = psd.imageData;
-    // psd.imageData.data is a Uint8ClampedArray of RGBA.
-    return sharp(Buffer.from(data.buffer, data.byteOffset, data.byteLength), {
-      raw: { width, height, channels: 4 },
-    });
+  if (SHARP_NATIVE_SOURCES.has(sourceKind)) {
+    return sharp(file.buffer);
   }
 
-  if (sourceKind === 'bmp') {
-    const decoded = bmpJs.decode(file.buffer, true);
-    return sharp(decoded.data, {
-      raw: { width: decoded.width, height: decoded.height, channels: 4 },
-    });
-  }
-
-  if (sourceKind === 'heif') {
-    // sharp's prebuilt libvips ships libheif without the HEVC decoder plugin
-    // (libde265) — the same patent-related omission that excludes HEIC from
-    // the output side. With no plugin, sharp parses the HEIF container fine
-    // (metadata works) but throws "No decoding plugin installed" at the
-    // moment of pixel extraction — too late for a try/catch on metadata to
-    // catch. Decode unconditionally via heic-decode (pure-JS libde265-WASM)
-    // and hand the raw pixels to sharp. AVIF files are routed through the
-    // 'avif' source kind, not here.
-    const { width, height, data } = await heicDecode({ buffer: file.buffer });
-    return sharp(Buffer.from(data.buffer, data.byteOffset, data.byteLength), {
-      raw: { width, height, channels: 4 },
-    });
-  }
-
-  return sharp(file.buffer);
+  // heif, psd, bmp — and any future v1.x format (jxl, jp2, exr, raw, …).
+  // See lib/magick.js for the wrapper; Phase 0 validation report for the
+  // per-format gating decisions and known limitations (no Ghostscript so
+  // PDF input needs a separate decoder; HEIC output stays excluded).
+  const { width, height, data } = await magick.decodeToRawRgba(file.buffer);
+  return sharp(data, { raw: { width, height, channels: 4 } });
 }
 
 // -- ICO encoder (inline) -----------------------------------------------------
@@ -307,13 +256,15 @@ const ENCODERS = {
   bmp: {
     ext: 'bmp',
     async encode(pipeline) {
-      // sharp cannot write BMP; produce raw RGBA and encode via bmp-js.
+      // sharp cannot write BMP; produce raw RGBA and hand to magick-wasm.
       const { data, info } = await pipeline
         .ensureAlpha()
         .raw()
         .toBuffer({ resolveWithObject: true });
-      const encoded = bmpJs.encode({ data, width: info.width, height: info.height });
-      return encoded.data;
+      return magick.encodeFromRawRgba(
+        { width: info.width, height: info.height, data },
+        'bmp',
+      );
     },
   },
 

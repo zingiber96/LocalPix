@@ -9,10 +9,8 @@
     "dist": "electron-builder --mac"
   },
   "dependencies": {
-    "ag-psd": "^25.0.0",
-    "bmp-js": "^0.1.0",
+    "@imagemagick/magick-wasm": "^0.0.40",
     "express": "^4.18.2",
-    "heic-decode": "^2.1.0",
     "multer": "^2.1.1",
     "sharp": "^0.33.0"
   },
@@ -39,7 +37,7 @@
     "asarUnpack": [
       "node_modules/sharp/**/*",
       "node_modules/@img/**/*",
-      "node_modules/libheif-js/**/*"
+      "node_modules/@imagemagick/**/*"
     ],
     "mac": {
       "category": "public.app-category.utilities",
