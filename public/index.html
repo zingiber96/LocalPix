@@ -354,7 +354,11 @@
 
     .format-buttons {
       display: grid;
-      grid-template-columns: repeat(8, minmax(0, 1fr));
+      /* auto-fit keeps the segmented bar tidy at every width — buttons
+         flow into as many columns as fit, then wrap as a unit. Avoids the
+         "orphan ICO on row 2" problem that hardcoded column counts have
+         every time a new format gets added. */
+      grid-template-columns: repeat(auto-fit, minmax(72px, 1fr));
       gap: 4px;
       background: var(--surface-2);
       padding: 4px;
@@ -874,9 +878,6 @@
     /* --- Responsive narrow -------------------------------------------- */
 
     @media (max-width: 720px) {
-      .format-buttons {
-        grid-template-columns: repeat(4, minmax(0, 1fr));
-      }
       #options-panel {
         grid-template-columns: 1fr;
         gap: 14px;
@@ -959,28 +960,30 @@
 
     <div class="format-bar">
       <div class="format-buttons" id="format-buttons" role="radiogroup" aria-label="Output format">
-        <button type="button" class="format-btn" data-format="jpeg" role="radio">JPEG</button>
-        <button type="button" class="format-btn" data-format="png"  role="radio">PNG</button>
-        <button type="button" class="format-btn active" data-format="webp" role="radio" aria-checked="true">WebP</button>
         <button type="button" class="format-btn" data-format="avif" role="radio">AVIF</button>
-        <button type="button" class="format-btn" data-format="gif"  role="radio">GIF</button>
-        <button type="button" class="format-btn" data-format="tiff" role="radio">TIFF</button>
         <button type="button" class="format-btn" data-format="bmp"  role="radio">BMP</button>
+        <button type="button" class="format-btn" data-format="gif"  role="radio">GIF</button>
         <button type="button" class="format-btn" data-format="ico"  role="radio">ICO</button>
+        <button type="button" class="format-btn" data-format="jpeg" role="radio">JPEG</button>
+        <button type="button" class="format-btn" data-format="jxl"  role="radio">JPEG XL</button>
+        <button type="button" class="format-btn" data-format="png"  role="radio">PNG</button>
+        <button type="button" class="format-btn" data-format="tiff" role="radio">TIFF</button>
+        <button type="button" class="format-btn active" data-format="webp" role="radio" aria-checked="true">WebP</button>
       </div>
     </div>
 
     <!-- Hidden native select retained so existing JS reading targetSelect.value
          keeps working. The button group above syncs into it. -->
     <select id="target-format">
-      <option value="jpeg">JPEG</option>
-      <option value="png">PNG</option>
-      <option value="webp" selected>WebP</option>
       <option value="avif">AVIF</option>
-      <option value="gif">GIF</option>
-      <option value="tiff">TIFF</option>
       <option value="bmp">BMP</option>
+      <option value="gif">GIF</option>
       <option value="ico">ICO</option>
+      <option value="jpeg">JPEG</option>
+      <option value="jxl">JPEG XL</option>
+      <option value="png">PNG</option>
+      <option value="tiff">TIFF</option>
+      <option value="webp" selected>WebP</option>
     </select>
 
     <div class="format-description" id="format-description">
@@ -998,6 +1001,25 @@
           <option value="192" selected>2× (192 dpi)</option>
           <option value="288">3× (288 dpi)</option>
         </select>
+      </div>
+    </div>
+  </section>
+
+  <!-- Privacy / metadata ----------------------------------------------- -->
+  <!-- Two global toggles that apply across every conversion: strip EXIF/GPS
+       to scrub personal data, and optionally keep the color profile so the
+       output's colors don't shift. Defaults match LocalPix's pre-v1.1 behavior
+       (sharp strips by default), so the WebP byte-identical guarantee holds. -->
+  <section class="section">
+    <div class="section-label">Privacy</div>
+    <div style="display:flex; flex-wrap:wrap; gap:18px 24px;">
+      <div class="checkbox-row no-pad">
+        <input type="checkbox" id="strip-metadata" checked />
+        <label for="strip-metadata">Strip metadata (EXIF, GPS, camera info)</label>
+      </div>
+      <div class="checkbox-row no-pad">
+        <input type="checkbox" id="preserve-color-profile" />
+        <label for="preserve-color-profile">Preserve color profile</label>
       </div>
     </div>
   </section>
@@ -1033,7 +1055,7 @@
   </section>
 
   <footer class="app-footer">
-    LocalPix · v1 · offline image converter
+    LocalPix · v1.1 · offline image converter
   </footer>
 
 </div>
@@ -1081,6 +1103,14 @@
       fields: [
         { key: 'quality', type: 'slider', min: 1, max: 100, def: 50, label: 'Quality' },
         { key: 'effort', type: 'slider', min: 0, max: 9, def: 4, label: 'Effort' },
+      ],
+    },
+    jxl: {
+      label: 'JPEG XL',
+      description: 'Modern · royalty-free · supports lossless + alpha · slow encode at high effort',
+      fields: [
+        { key: 'quality', type: 'slider', min: 1, max: 100, def: 80, label: 'Quality' },
+        { key: 'effort', type: 'slider', min: 1, max: 9, def: 7, label: 'Effort (lower = faster)' },
       ],
     },
     gif: {
@@ -1138,13 +1168,14 @@
     if (ext === '.png' || m === 'image/png') return 'png';
     if (ext === '.webp' || m === 'image/webp') return 'webp';
     if (ext === '.avif' || m === 'image/avif') return 'avif';
+    if (ext === '.jxl' || m === 'image/jxl') return 'jxl';
     if (['.tif', '.tiff'].includes(ext) || m === 'image/tiff') return 'tiff';
     if (['.jpg', '.jpeg'].includes(ext) || m === 'image/jpeg' || m === 'image/jpg') return 'jpeg';
     return 'unknown';
   }
 
   const SOURCE_KINDS_WITH_POSSIBLE_ALPHA = new Set(
-    ['png', 'webp', 'gif', 'svg', 'tiff', 'psd', 'heif', 'avif']
+    ['png', 'webp', 'gif', 'svg', 'tiff', 'psd', 'heif', 'avif', 'jxl']
   );
 
   // Per-file state. id -> { file, kind, rowEl, state, naturalW, naturalH }.
@@ -1516,6 +1547,13 @@
     if (entry.kind === 'svg') {
       formData.append('inputDensity', svgDensity.value);
     }
+    // Metadata toggles. Only send when they deviate from defaults so the
+    // server keeps its byte-identical no-op default behavior when both are
+    // at the stock values.
+    const stripEl = document.getElementById('strip-metadata');
+    const preserveEl = document.getElementById('preserve-color-profile');
+    if (stripEl && !stripEl.checked) formData.append('stripMetadata', 'false');
+    if (preserveEl && preserveEl.checked) formData.append('preserveColorProfile', 'true');
 
     try {
       const resp = await fetch('/api/convert', { method: 'POST', body: formData });
@@ -1650,6 +1688,22 @@
       });
       window.localpix.onOutputFolderChanged?.((p) => setOutputFolderDisplay(p));
     }
+  })();
+
+  // -- Privacy / metadata toggles -------------------------------------------
+  // "Preserve color profile" only makes sense when "Strip metadata" is on —
+  // if we're keeping all metadata, the ICC profile is part of that and the
+  // checkbox is redundant. Gray it out in that case so the meaning is clear.
+  (function initMetadataToggles() {
+    const stripEl = document.getElementById('strip-metadata');
+    const preserveEl = document.getElementById('preserve-color-profile');
+    if (!stripEl || !preserveEl) return;
+    function syncPreserveEnabled() {
+      preserveEl.disabled = !stripEl.checked;
+      preserveEl.parentElement.style.opacity = stripEl.checked ? '' : '0.5';
+    }
+    stripEl.addEventListener('change', syncPreserveEnabled);
+    syncPreserveEnabled();
   })();
 
   // Initial render

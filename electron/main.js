@@ -1,4 +1,4 @@
-const { app, BrowserWindow, Menu, shell, dialog, ipcMain } = require('electron');
+const { app, BrowserWindow, Menu, shell, dialog, ipcMain, nativeTheme, nativeImage } = require('electron');
 const path = require('path');
 const fs = require('fs');
 
@@ -148,6 +148,28 @@ async function pickOutputFolder() {
 ipcMain.handle('localpix:get-output-folder', () => getOutputDir());
 ipcMain.handle('localpix:select-output-folder', () => pickOutputFolder());
 
+// macOS Dock icon — swap between light and dark variants when the system
+// appearance changes. This only affects the live Dock icon; the Finder /
+// Applications-folder icon is static (driven by Contents/Resources/icon.icns
+// and not reachable from runtime code without an Asset Catalog build).
+//
+// We lazy-load the NativeImages on first use; loading is cheap and doing it
+// upfront before app.whenReady would error.
+const DOCK_ICON_LIGHT_PATH = path.join(__dirname, '..', 'assets', 'dock-icon-light.png');
+const DOCK_ICON_DARK_PATH = path.join(__dirname, '..', 'assets', 'dock-icon-dark.png');
+let _dockIconLight = null;
+let _dockIconDark = null;
+
+function applyDockIcon() {
+  if (process.platform !== 'darwin' || !app.dock) return;
+  if (!_dockIconLight) _dockIconLight = nativeImage.createFromPath(DOCK_ICON_LIGHT_PATH);
+  if (!_dockIconDark)  _dockIconDark  = nativeImage.createFromPath(DOCK_ICON_DARK_PATH);
+  const icon = nativeTheme.shouldUseDarkColors ? _dockIconDark : _dockIconLight;
+  if (icon && !icon.isEmpty()) app.dock.setIcon(icon);
+}
+
+nativeTheme.on('updated', applyDockIcon);
+
 function createWindow() {
   mainWindow = new BrowserWindow({
     width: 960,
@@ -186,6 +208,7 @@ app.whenReady().then(async () => {
 
   buildMenu();
   createWindow();
+  applyDockIcon();
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();
