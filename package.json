@@ -1,7 +1,9 @@
 {
   "name": "localpix",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "description": "Local, offline image converter — batch-convert between JPEG, PNG, WebP, AVIF, GIF, TIFF, BMP, ICO and more.",
+  "license": "MIT",
+  "author": "James Folsom",
   "main": "electron/main.js",
   "scripts": {
     "start": "node server.js",
@@ -17,6 +19,7 @@
   "dependencies": {
     "@imagemagick/magick-wasm": "^0.0.40",
     "express": "^4.18.2",
+    "express-rate-limit": "^8.5.2",
     "multer": "^2.1.1",
     "sharp": "^0.33.0"
   },

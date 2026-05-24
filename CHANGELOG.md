@@ -5,6 +5,39 @@ All notable changes to LocalPix will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project loosely follows [Semantic Versioning](https://semver.org/).
 
+## [1.1.1] — 2026-05-24
+
+### Security
+
+- **Path-traversal defense.** Defensive `path.basename()` + outputDir boundary
+  checks added to `resolveOutputPath()` and the `/api/download/:filename`
+  handler. Filenames containing traversal sequences (`..`, absolute paths,
+  OS-specific separator tricks) now safely land inside the output folder or
+  are rejected. Closes the two CodeQL "Uncontrolled data used in path
+  expression" alerts.
+- **Rate limiting** via `express-rate-limit` on the conversion (100/min) and
+  download (300/min) endpoints, with standard `RateLimit` response headers.
+  The server still binds to loopback only (`127.0.0.1`); the threat model is
+  "a malicious local webpage that has discovered the loopback port," not the
+  public internet. Closes the two CodeQL "Missing rate limiting" alerts.
+
+### Added
+
+- **MIT License** (`LICENSE` file + `license`/`author` fields in `package.json`).
+- **GitHub Actions release pipeline** (`.github/workflows/release.yml`).
+  Pushing a `v*` tag now triggers parallel macOS + Windows builds and creates
+  a draft GitHub Release with both artifacts and release notes auto-extracted
+  from this CHANGELOG.
+- **`scripts/build-icns.sh`** — reusable macOS `.icns` generator from any
+  1024×1024 PNG master. Used to build both the light and dark icon variants.
+
+### Notes
+
+- Three CodeQL "DOM text reinterpreted as HTML" alerts in
+  `public/index.html` remain open as won't-fix — all interpolated values flow
+  through `escHtml()` and aren't reachable XSS. Pencilled in for a full
+  DOM-API refactor in v1.2.
+
 ## [1.1.0] — 2026
 
 ### Added

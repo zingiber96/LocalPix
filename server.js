@@ -4,6 +4,7 @@
 
 const express = require('express');
 const multer = require('multer');
+const rateLimit = require('express-rate-limit');
 const sharp = require('sharp');
 const path = require('path');
 const fs = require('fs');
@@ -386,13 +387,51 @@ function createApp() {
   function resolveOutputPath(baseName) {
     // Read outputDir at call time, not at app-creation time, so changes via
     // setOutputDir() take effect on the next conversion without a restart.
-    const candidate = path.join(outputDir, baseName);
+    //
+    // Defensive normalization: baseName originates from req.file.originalname
+    // (via path.parse(name).name upstream). Re-basename here strips any path
+    // components a single sanitization layer might miss (null bytes, mixed
+    // separators on different OSes, etc.) and then verify the resolved path
+    // actually lands inside outputDir before writing.
+    const safeName = path.basename(String(baseName));
+    if (!safeName || safeName === '.' || safeName === '..') {
+      throw new Error('Invalid output filename');
+    }
+    const outputDirAbs = path.resolve(outputDir);
+    const candidate = path.resolve(outputDirAbs, safeName);
+    if (
+      candidate !== outputDirAbs &&
+      !candidate.startsWith(outputDirAbs + path.sep)
+    ) {
+      throw new Error('Invalid output filename');
+    }
     if (!fs.existsSync(candidate)) return candidate;
     const ts = Date.now();
-    const ext = path.extname(baseName);
-    const stem = path.basename(baseName, ext);
-    return path.join(outputDir, `${stem}_${ts}${ext}`);
+    const ext = path.extname(safeName);
+    const stem = path.basename(safeName, ext);
+    return path.join(outputDirAbs, `${stem}_${ts}${ext}`);
   }
+
+  // -- Rate limiters ----------------------------------------------------------
+  // The server binds to 127.0.0.1 only, so the actual threat surface is "a
+  // malicious local webpage that has discovered our loopback port and is
+  // flooding it." Permissive limits — set far above any legitimate human use
+  // but tight enough to neuter a runaway script. Standard headers so the
+  // frontend (or a future CLI) can read the rate state.
+  const convertLimiter = rateLimit({
+    windowMs: 60 * 1000,   // 1 minute window
+    limit: 100,            // 100 conversions / minute / IP
+    standardHeaders: 'draft-7',
+    legacyHeaders: false,
+    message: { error: 'Too many conversion requests. Please slow down.' },
+  });
+  const downloadLimiter = rateLimit({
+    windowMs: 60 * 1000,
+    limit: 300,            // looser — downloads are cheap, batches re-fetch
+    standardHeaders: 'draft-7',
+    legacyHeaders: false,
+    message: { error: 'Too many download requests. Please slow down.' },
+  });
 
   // Lightweight config endpoint — lets the frontend display the current
   // output folder in the UI and detect whether it's running in Electron.
@@ -406,7 +445,7 @@ function createApp() {
     });
   });
 
-  app.post('/api/convert', upload.single('image'), async (req, res) => {
+  app.post('/api/convert', convertLimiter, upload.single('image'), async (req, res) => {
     if (!req.file) {
       return res.status(400).json({ error: 'No file uploaded.' });
     }
@@ -460,9 +499,15 @@ function createApp() {
     }
   });
 
-  app.get('/api/download/:filename', (req, res) => {
+  app.get('/api/download/:filename', downloadLimiter, (req, res) => {
+    // path.basename strips any path components from the request param.
+    // Belt-and-braces: verify the resolved path stays inside outputDir.
     const filename = path.basename(req.params.filename);
-    const filePath = path.join(outputDir, filename);
+    const outputDirAbs = path.resolve(outputDir);
+    const filePath = path.resolve(outputDirAbs, filename);
+    if (!filePath.startsWith(outputDirAbs + path.sep)) {
+      return res.status(400).json({ error: 'Invalid filename.' });
+    }
 
     if (!fs.existsSync(filePath)) {
       return res.status(404).json({ error: 'File not found.' });
