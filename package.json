@@ -8,9 +8,11 @@
     "app": "electron .",
     "dist": "electron-builder --mac",
     "dist:mac": "electron-builder --mac",
-    "dist:win": "electron-builder --win --x64",
-    "dist:win-all": "electron-builder --win --x64 --arm64",
-    "dist:all": "electron-builder --mac --win --x64"
+    "_prep:win-x64": "npm install --no-save --include=optional --os=win32 --cpu=x64 sharp",
+    "_prep:win-arm64": "npm install --no-save --include=optional --os=win32 --cpu=arm64 sharp",
+    "dist:win": "npm run _prep:win-x64 && electron-builder --win --x64",
+    "dist:win-all": "npm run _prep:win-x64 && npm run _prep:win-arm64 && electron-builder --win --x64 --arm64",
+    "dist:all": "npm run _prep:win-x64 && electron-builder --mac --win --x64"
   },
   "dependencies": {
     "@imagemagick/magick-wasm": "^0.0.40",
@@ -48,16 +50,14 @@
     "mac": {
       "category": "public.app-category.utilities",
       "target": [
-        "dmg",
-        "zip"
+        "dmg"
       ],
       "icon": "build/icon.icns",
-      "identity": null
+      "identity": "-"
     },
     "win": {
       "target": [
-        "nsis",
-        "zip"
+        "nsis"
       ],
       "icon": "build/icon.png"
     }
