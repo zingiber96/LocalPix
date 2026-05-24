@@ -6,10 +6,13 @@
 Convert between JPEG, PNG, WebP, AVIF, JPEG XL, GIF, TIFF, BMP and ICO — without uploading anything.
 
 [**Download the latest release →**](../../releases/latest)
+
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/screenshot-dark.png">
-  <img src="docs/screenshot-light.png" alt="LocalPix screenshot" width="720">
+  <source media="(prefers-color-scheme: light)" srcset="docs/screenshot-light.png">
+  <img alt="LocalPix screenshot" src="docs/screenshot-light.png" width="720">
 </picture>
+
 </div>
 
 ## Why LocalPix?
