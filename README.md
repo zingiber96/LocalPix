@@ -161,16 +161,32 @@ npm start          # plain HTTP server at localhost:3000
 npm run app        # Electron desktop window (the full LocalPix experience)
 ```
 
-### Build distributables
+### Build distributables locally
 
 ```bash
-npm run dist:mac       # macOS .dmg + .zip (Apple Silicon)
-npm run dist:win       # Windows installer .exe + portable .zip (x64)
+npm run dist:mac       # macOS .dmg (Apple Silicon)
+npm run dist:win       # Windows installer .exe (x64)
 npm run dist:win-all   # Windows x64 AND ARM64
 npm run dist:all       # macOS + Windows x64 in one shot
 ```
 
-Output lands in `release/`. macOS builds require macOS. Windows builds cross-compile cleanly from macOS — `electron-builder` auto-downloads Wine + NSIS on first run (~25 MB, cached afterward).
+Output lands in `release/`. macOS builds require macOS. Windows builds cross-compile cleanly from macOS — `electron-builder` auto-downloads Wine + NSIS on first run (~25 MB, cached afterward), and the `dist:win` / `dist:win-all` / `dist:all` scripts auto-fetch the Windows-platform `sharp` native binaries via `_prep:win-x64` / `_prep:win-arm64` hooks.
+
+### Cut a release (recommended path)
+
+Local builds are for development. **Actual releases are built by GitHub Actions** so they're reproducible and platform-correct — see [`.github/workflows/release.yml`](.github/workflows/release.yml).
+
+```bash
+# 1. Bump version in package.json + add a `## [x.y.z]` section to CHANGELOG.md
+# 2. Commit + push to main
+# 3. Tag and push the tag
+git tag vx.y.z
+git push origin main --tags
+```
+
+A few minutes later, a **draft release** appears in the Releases page with the DMG + EXE attached and release notes auto-extracted from CHANGELOG.md. Review the draft, then click Publish.
+
+For testing the build pipeline without creating a release, use the **workflow_dispatch** trigger from the Actions tab — artifacts will be uploaded to the workflow run only.
 
 ### Run as a headless server (Docker)
 
