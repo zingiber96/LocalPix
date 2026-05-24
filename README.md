@@ -27,10 +27,10 @@ Convert between JPEG, PNG, WebP, AVIF, JPEG XL, GIF, TIFF, BMP and ICO — witho
 
 Grab the right file from the [latest release](../../releases/latest):
 
-| Platform | Download | Notes |
-|---|---|---|
-| **macOS** (Apple Silicon — M1/M2/M3/M4) | `LocalPix-*-arm64.dmg` | Universal installer. Also available as a portable `.zip`. |
-| **Windows** (Intel/AMD) | `LocalPix Setup *.exe` | Standard installer. Also available as a portable `.zip`. |
+| Platform | Download |
+|---|---|
+| **macOS** (Apple Silicon — M1/M2/M3/M4) | `LocalPix-*-arm64.dmg` |
+| **Windows** (Intel/AMD) | `LocalPix Setup *.exe` |
 
 Intel Macs and Windows ARM aren't in the default release but can be built from source — see [For developers](#for-developers) below.
 
@@ -40,11 +40,11 @@ Intel Macs and Windows ARM aren't in the default release but can be built from s
 
 1. Open the downloaded `.dmg`.
 2. Drag **LocalPix** to your **Applications** folder.
-3. **First launch:** macOS will show *"LocalPix can't be opened because it is from an unidentified developer."*
-   - **Right-click** the app → **Open** → **Open** in the next dialog.
-   - Or run `xattr -dr com.apple.quarantine /Applications/LocalPix.app` in Terminal.
+3. **First launch:** macOS will show a warning that *"Apple could not verify LocalPix is free of malicious software."* Pick one of these:
+   - **Right-click** (or Ctrl-click) the app → **Open** → **Open** in the next dialog. Only needed once.
+   - Or open **System Settings → Privacy & Security**, scroll to the LocalPix message at the bottom, and click **Open Anyway**.
 
-> This warning shows because Apple charges $99/year to "sign" software, and LocalPix is free and unsigned. The app itself is identical to any other Mac app — the warning is just macOS being cautious about software that hasn't paid Apple's fee.
+> This warning shows for any app that hasn't been signed with Apple's $99/year Developer ID. LocalPix is genuine — the warning is just macOS being cautious about software that hasn't paid for the certificate. After the first launch, you won't be prompted again.
 
 ### Windows
 
