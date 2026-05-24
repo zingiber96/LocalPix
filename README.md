@@ -6,15 +6,10 @@
 Convert between JPEG, PNG, WebP, AVIF, JPEG XL, GIF, TIFF, BMP and ICO — without uploading anything.
 
 [**Download the latest release →**](../../releases/latest)
-
-<!-- Save the two screenshots to docs/screenshot-light.png and docs/screenshot-dark.png
-     to make this hero image render. GitHub picks the right variant based on the
-     viewer's color scheme. -->
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/screenshot-dark.png">
-  <img src="docs/screenshot-light.png" alt="LocalPix on macOS, showing the drop zone, format selector, quality controls, and output folder" width="720">
+  <img src="docs/screenshot-light.png" alt="LocalPix screenshot" width="720">
 </picture>
-
 </div>
 
 ## Why LocalPix?
