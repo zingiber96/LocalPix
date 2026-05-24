@@ -1,0 +1,172 @@
+# Release pipeline for LocalPix.
+#
+# Trigger:
+#   - Push a tag matching `v*` (e.g. `v1.1.1`) to build the DMG + EXE and
+#     attach them to a draft GitHub Release.
+#   - Manual `workflow_dispatch` from the Actions tab to test-build the
+#     artifacts without creating any release (useful for CI debugging).
+#
+# Architecture:
+#   - Two parallel matrix jobs build the platform-specific artifacts on
+#     their native runners (macos-latest → DMG, windows-latest → EXE).
+#     This avoids the cross-build sharp native-deps gotchas we hit when
+#     building Windows from macOS locally.
+#   - A final ubuntu-latest job downloads both artifacts, extracts the
+#     matching version's section from CHANGELOG.md, and creates a draft
+#     release in the GitHub UI for you to review + publish.
+#
+# Cutting a release:
+#   1. Bump `version` in package.json + add a `## [x.y.z]` section to
+#      CHANGELOG.md, commit, push to main.
+#   2. `git tag vx.y.z && git push --tags`
+#   3. ~5 min later: a draft release appears in the Releases page with
+#      the DMG and EXE attached. Review notes, click Publish.
+
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to test-build (must match package.json). No release is created — artifacts upload to the workflow run only.'
+        required: true
+
+# If someone tags twice in quick succession, only the latest build wins.
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: write   # required to create a release via softprops/action-gh-release
+
+env:
+  # Pin Electron / electron-builder caches to workspace-relative paths so
+  # actions/cache works identically on macos and windows runners.
+  ELECTRON_CACHE: ${{ github.workspace }}/.cache/electron
+  ELECTRON_BUILDER_CACHE: ${{ github.workspace }}/.cache/electron-builder
+
+jobs:
+  # ---------------------------------------------------------------------------
+  # Build platform artifacts in parallel.
+  # ---------------------------------------------------------------------------
+  build:
+    name: Build ${{ matrix.target }}
+    strategy:
+      fail-fast: true   # abort the other platform if one fails (save credits)
+      matrix:
+        include:
+          - os: macos-latest
+            target: macOS
+            script: dist:mac
+            artifact_glob: 'release/*.dmg'
+            artifact_name: macos-dmg
+          - os: windows-latest
+            target: Windows
+            script: dist:win
+            artifact_glob: 'release/*.exe'
+            artifact_name: windows-exe
+    runs-on: ${{ matrix.os }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      - name: Cache Electron binaries
+        uses: actions/cache@v4
+        with:
+          path: |
+            .cache/electron
+            .cache/electron-builder
+          key: ${{ runner.os }}-electron-${{ hashFiles('package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-electron-
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Verify version matches trigger
+        shell: bash
+        run: |
+          PKG_VERSION=$(node -p "require('./package.json').version")
+          if [ -n "${{ inputs.version }}" ]; then
+            EXPECTED="${{ inputs.version }}"
+          else
+            EXPECTED="${GITHUB_REF#refs/tags/v}"
+          fi
+          echo "package.json version: $PKG_VERSION"
+          echo "Trigger expects:      $EXPECTED"
+          if [ "$PKG_VERSION" != "$EXPECTED" ]; then
+            echo "::error::Version mismatch — bump package.json to $EXPECTED before tagging."
+            exit 1
+          fi
+
+      - name: Build
+        run: npm run ${{ matrix.script }}
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact_name }}
+          path: ${{ matrix.artifact_glob }}
+          if-no-files-found: error
+
+  # ---------------------------------------------------------------------------
+  # Combine artifacts into a single draft GitHub Release.
+  # Skipped on workflow_dispatch — that path is for testing the build itself.
+  # ---------------------------------------------------------------------------
+  release:
+    name: Create draft release
+    needs: build
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
+    steps:
+      - name: Checkout (for CHANGELOG)
+        uses: actions/checkout@v4
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          merge-multiple: true
+
+      - name: Extract release notes from CHANGELOG.md
+        shell: bash
+        run: |
+          VERSION="${GITHUB_REF#refs/tags/v}"
+          # Capture everything between the `## [VERSION]` heading and the
+          # next `## [` heading. If nothing matches, fall back to a CHANGELOG link.
+          NOTES=$(awk -v ver="$VERSION" '
+            $0 ~ "^## \\[" ver "\\]" { capture = 1; next }
+            capture && /^## \[/ { exit }
+            capture { print }
+          ' CHANGELOG.md)
+          if [ -z "$(echo "$NOTES" | tr -d "[:space:]")" ]; then
+            NOTES="See [CHANGELOG.md](https://github.com/${{ github.repository }}/blob/main/CHANGELOG.md)."
+          fi
+          echo "$NOTES" > release-notes.md
+          echo "----- Release notes for v$VERSION -----"
+          cat release-notes.md
+          echo "----- end -----"
+
+      - name: List artifacts (for build-log debugging)
+        run: ls -la artifacts/
+
+      - name: Create draft release
+        uses: softprops/action-gh-release@v2
+        with:
+          draft: true
+          tag_name: ${{ github.ref_name }}
+          name: ${{ github.ref_name }}
+          body_path: release-notes.md
+          files: |
+            artifacts/*.dmg
+            artifacts/*.exe
+          fail_on_unmatched_files: true
