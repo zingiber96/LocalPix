@@ -1,139 +1,211 @@
+<div align="center">
+
 # LocalPix
 
-A local, offline image converter. Batch-convert between JPEG, PNG, WebP,
-AVIF, GIF, TIFF, BMP and ICO — and read HEIC, SVG and PSD as inputs. No
-upload, no telemetry, no account.
+**A free, offline image converter for macOS and Windows.**
+Convert between JPEG, PNG, WebP, AVIF, JPEG XL, GIF, TIFF, BMP and ICO — without uploading anything.
 
-## Requirements
+[**Download the latest release →**](../../releases/latest)
 
-- [Node.js](https://nodejs.org/) v18 or later
-- npm (bundled with Node)
+<!-- Save the two screenshots to docs/screenshot-light.png and docs/screenshot-dark.png
+     to make this hero image render. GitHub picks the right variant based on the
+     viewer's color scheme. -->
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/screenshot-dark.png">
+  <img src="docs/screenshot-light.png" alt="LocalPix on macOS, showing the drop zone, format selector, quality controls, and output folder" width="720">
+</picture>
 
-## Setup
+</div>
+
+## Why LocalPix?
+
+- **It's local.** Your images never leave your computer. No upload, no account, no telemetry.
+- **It's free and open source.** Use it for personal or commercial work; no subscriptions, no watermarks.
+- **It's fast.** Native image processing — typical conversions are done in milliseconds.
+- **It supports the formats you actually have.** Read 10 common formats including iPhone HEIC, Photoshop PSD, and SVG. Write 9, including modern ones like AVIF and JPEG XL.
+- **It handles batches.** Drop a whole folder, convert everything at once. Per-format quality controls, privacy controls, custom output folder.
+
+## Download
+
+Grab the right file from the [latest release](../../releases/latest):
+
+| Platform | Download | Notes |
+|---|---|---|
+| **macOS** (Apple Silicon — M1/M2/M3/M4) | `LocalPix-*-arm64.dmg` | Universal installer. Also available as a portable `.zip`. |
+| **Windows** (Intel/AMD) | `LocalPix Setup *.exe` | Standard installer. Also available as a portable `.zip`. |
+
+Intel Macs and Windows ARM aren't in the default release but can be built from source — see [For developers](#for-developers) below.
+
+## Install
+
+### macOS
+
+1. Open the downloaded `.dmg`.
+2. Drag **LocalPix** to your **Applications** folder.
+3. **First launch:** macOS will show *"LocalPix can't be opened because it is from an unidentified developer."*
+   - **Right-click** the app → **Open** → **Open** in the next dialog.
+   - Or run `xattr -dr com.apple.quarantine /Applications/LocalPix.app` in Terminal.
+
+> This warning shows because Apple charges $99/year to "sign" software, and LocalPix is free and unsigned. The app itself is identical to any other Mac app — the warning is just macOS being cautious about software that hasn't paid Apple's fee.
+
+### Windows
+
+1. Double-click the installer (`LocalPix Setup *.exe`).
+2. **Windows may show** *"Windows protected your PC"* via SmartScreen.
+   - Click **More info**, then **Run anyway**.
+3. The installer drops LocalPix into your user folder — no admin password needed.
+
+> Same story as the macOS warning. SmartScreen flags software that hasn't been signed with a $300+ Windows code-signing certificate. LocalPix is genuine; it just hasn't paid for the sticker.
+
+## How to use it
+
+1. **Drag images** into the drop zone, or click to browse.
+2. **Pick an output format** from the row of buttons (alphabetical: AVIF, BMP, GIF, ICO, JPEG, JPEG XL, PNG, TIFF, WebP).
+3. **Tweak quality, effort, or other options** if you want — defaults are sensible for everyday use.
+4. **Click Convert** on a file row or **Convert All** for a batch.
+
+Converted files land in `~/Documents/LocalPix/` by default. Click **Change…** next to the output folder to pick somewhere else; LocalPix remembers your choice between launches.
+
+## Supported formats
+
+### Inputs (formats LocalPix can read)
+
+JPEG · PNG · WebP · AVIF · GIF · **HEIF/HEIC** · TIFF · BMP · **SVG** · **PSD**
+
+### Outputs (formats LocalPix can save as)
+
+JPEG · PNG · WebP · AVIF · **JPEG XL** · GIF · TIFF · BMP · ICO
+
+## Privacy controls
+
+By default, LocalPix **strips EXIF, GPS coordinates, and other metadata** from converted images. This is the safe choice if you're sharing photos publicly — your camera model, location, software, and timestamps stay private.
+
+- Turn **Strip metadata** off if you want to keep all original metadata (e.g. preserving camera info for personal archives).
+- Turn **Preserve color profile** on (with Strip on) if you want personal data scrubbed but need colors to render correctly in colour-managed apps (this keeps the ICC profile).
+
+## FAQ
+
+**Where do my converted files go?**
+By default, `~/Documents/LocalPix/` (macOS) or `Documents\LocalPix\` (Windows). Change this in the app via the **Change…** button or the **Output → Change Output Folder…** menu (`⌘⇧O` / `Ctrl+Shift+O`).
+
+**Why can't I save as HEIC?**
+HEIC uses the HEVC codec, which has patent licensing complications that make it difficult to include in free, open-source software. LocalPix reads HEIC files (your iPhone photos) without issue, but doesn't write them. **AVIF** is the modern alternative — same container family, comparable compression, but royalty-free.
+
+**Why can't I save as SVG or PSD?**
+SVG is a vector format; converting a photo to SVG is a fundamentally different task ("tracing") that doesn't make sense for arbitrary images. PSD is a layered Photoshop format; LocalPix can read the flattened image but writing a useful `.psd` requires the source app's layer structure.
+
+**Does LocalPix send my images anywhere?**
+No. Everything happens on your computer. There's no analytics, no telemetry, no "phone home." You can verify by disconnecting from the internet or watching your firewall — LocalPix will keep working.
+
+**Does it work offline?**
+Yes — once installed, you can be completely offline and LocalPix still works.
+
+**How does it compare to online converters?**
+Online converters upload your image to their server, process it, and let you download the result. That means:
+- Slower (upload + download time)
+- Privacy-sensitive (their server has your image, possibly logs it)
+- Limited (max file size, max batch size, ads)
+- Dependent on their service being up
+
+LocalPix avoids all of that.
+
+**Will it support [PDF / RAW camera files / other format]?**
+PDF input and RAW formats (DNG, CR2, NEF, ARW) are on the roadmap for upcoming versions. See [CHANGELOG.md](CHANGELOG.md) for recent changes; see [Issues](../../issues) for what's planned and to request features.
+
+**What's new in this version?**
+See [CHANGELOG.md](CHANGELOG.md).
+
+## Issues, ideas, contributions
+
+- Found a bug or want a feature? [Open an issue](../../issues).
+- Want to contribute code? See [For developers](#for-developers) below.
+
+---
+
+## For developers
+
+LocalPix is an Electron app wrapping a Node.js HTTP server. The renderer is a single hand-written HTML file (no build step). The conversion engine is a hybrid of two image libraries:
+
+- **[sharp](https://sharp.pixelplumbing.com/)** — native libvips bindings, used for the hot path (JPEG, PNG, WebP, AVIF, GIF, TIFF). Fast and battle-tested.
+- **[@imagemagick/magick-wasm](https://github.com/dlemstra/magick-wasm)** — ImageMagick compiled to WebAssembly, used for everything else (HEIC, PSD, BMP, JPEG XL, and future formats). Slower than sharp on common formats but supports ~270 formats out of the box.
+
+Adding a new format is one dispatch table entry per side (server + frontend config). No new dependencies needed.
+
+### Project layout
+
+```
+LocalPix/
+├── server.js              # Express server + ENCODERS dispatch table
+├── lib/magick.js          # Lazy-init wrapper around magick-wasm
+├── electron/
+│   ├── main.js            # Electron main: window, menus, folder picker, dock-icon swap
+│   └── preload.js         # contextBridge → window.localpix IPC API
+├── public/
+│   └── index.html         # Single-file frontend (vanilla JS, no build)
+├── assets/                # Runtime icon variants (light/dark)
+├── build/                 # Build-time icon source files
+├── CHANGELOG.md
+└── package.json           # electron-builder config in the "build" key
+```
+
+### Requirements
+
+- [Node.js](https://nodejs.org/) v18+ and npm
+
+### Run from source
 
 ```bash
-# Install dependencies (first run only)
+git clone https://github.com/zingiber96/WEBPConvert.git localpix
+cd localpix
 npm install
 
-# Start the server
-npm start
+npm start          # plain HTTP server at localhost:3000
+npm run app        # Electron desktop window (the full LocalPix experience)
 ```
 
-Then open **http://localhost:3000** in your browser.
-
-## Desktop app (click-to-launch, no terminal)
-
-A standalone macOS app — no Node, npm, or Docker needed by the end user.
-
-**Install:** open the DMG in `release/` and drag the app to Applications, then
-double-click it like any other app.
-
-Converted files are saved to **`~/Documents/LocalPix/`** by default — use
-**Output → Change Output Folder…** (⌘⇧O) to pick anywhere else. Open the
-current folder with **Output → Open Output Folder** (⌘O).
-
-### Building the app from source
+### Build distributables
 
 ```bash
-npm install          # installs Electron + electron-builder (dev deps)
-npm run app          # run the desktop app in dev mode
-npm run dist         # build release/*.dmg, *.zip and the .app bundle
+npm run dist:mac       # macOS .dmg + .zip (Apple Silicon)
+npm run dist:win       # Windows installer .exe + portable .zip (x64)
+npm run dist:win-all   # Windows x64 AND ARM64
+npm run dist:all       # macOS + Windows x64 in one shot
 ```
 
-> The build is unsigned (`identity: null`). On first launch macOS Gatekeeper
-> may warn — right-click the app → **Open**, or run
-> `xattr -dr com.apple.quarantine "LocalPix.app"`.
+Output lands in `release/`. macOS builds require macOS. Windows builds cross-compile cleanly from macOS — `electron-builder` auto-downloads Wine + NSIS on first run (~25 MB, cached afterward).
 
-## Run with Docker (standalone)
+### Run as a headless server (Docker)
 
-No Node install needed — just Docker.
+For a server-only deployment without a desktop window:
 
 ```bash
-# Build and run with Compose (recommended)
 docker compose up --build
-
-# …or with plain Docker
+# or
 docker build -t localpix .
 docker run -p 3000:3000 -v "$(pwd)/output:/app/output" localpix
 ```
 
-Open **http://localhost:3000**. Converted files are written to the host
-`./output` folder via a bind mount, so they persist after the container stops.
+Open `http://localhost:3000`. Output files persist to the host's `./output` via bind mount.
 
-To run it detached and manage it:
+### Adding a new output format
 
-```bash
-docker compose up -d --build   # start in background
-docker compose logs -f         # view logs
-docker compose down            # stop and remove
-```
+1. Add an entry to `ENCODERS` in `server.js` (existing entries are good templates — sharp-native ones return `pipeline.format().toBuffer()`, magick-routed ones go through `lib/magick.js`).
+2. Add an entry to `FORMAT_OPTIONS` in `public/index.html` for the UI options panel.
+3. Add a `<button>` to the segmented selector and an `<option>` to the hidden `<select>` (kept in sync alphabetically).
 
-## Supported formats
+That's it — the endpoint logic, dispatch, and per-file UI all flow from these three additions.
 
-### Read (input)
-
-JPEG, PNG, WebP, AVIF, **JPEG XL**, GIF, **HEIF/HEIC**, TIFF, BMP, **SVG**, **PSD**
-
-### Write (output)
-
-JPEG, PNG, WebP, AVIF, **JPEG XL**, GIF, TIFF, BMP, ICO
-
-### Input-only formats
-
-Three formats can be read but not written:
-
-- **SVG** — vector-to-raster is well-defined; raster-to-vector is tracing
-  rather than conversion, and is out of scope.
-- **PSD** — imported as a flattened composite. Layers, effects, masks and
-  adjustment layers are not preserved.
-- **HEIF/HEIC** — accepted as input (decoded locally). HEIC files use the
-  HEVC codec, and shipping an HEVC encoder (x265) in an open-source GitHub
-  release carries patent-pool licensing complications. AVIF — which uses the
-  same HEIF container with the royalty-free AV1 codec — covers the same
-  "modern, highly compressed" use case on the output side.
-
-## Features
-
-- Drag-and-drop or click-to-browse upload
-- Thumbnail preview before conversion (where the browser can render the format)
-- Per-format options: JPEG quality and progressive, PNG palette and compression,
-  WebP lossy/lossless and effort, AVIF quality and effort, GIF colours and loop,
-  TIFF compression, ICO size set
-- SVG rasterization at 1×, 2× or 3× resolution
-- Inline JPEG background-fill picker for transparent sources
-- Inline notice on non-square sources when targeting ICO
-- Convert all files at once or individually
-- File size before/after with savings percentage
-- Inline download links after conversion
-- Converted files saved to `./output/` with timestamp collision avoidance
-- Fully offline — no external APIs, analytics or telemetry
-
-## Architecture notes
-
-The conversion endpoint dispatches by target format via a single table in
-`server.js`. Each entry pairs an encoder function with a small options schema.
-The frontend renders the options panel from a parallel config in
-`public/index.html`. Adding a future format is one entry on each side; the
-endpoint logic itself stays unchanged.
-
-**Hybrid decode/encode** (since v1.1): `sharp` handles the hot path — JPEG,
-PNG, WebP, AVIF, GIF, TIFF — at native libvips speed, including preserving
-the byte-identical WebP output guarantee across every release back to the
-original WEBPConvert. Everything else (HEIF/HEIC input, PSD, BMP, JPEG XL,
-and any future v1.x format like JP2/EXR/RAW) routes through `magick-wasm`,
-which exposes ~270 formats through one consistent decoder/encoder API.
-See `lib/magick.js` for the wrapper and `CHANGELOG.md` for the broader
-story of why it's structured this way.
-
-For format-specific implementation details and v1 decisions (per-file vs.
-global options, animation flattening, the HEIC licensing reasoning), see the
-inline comments in `server.js`.
-
-## Dependencies
+### Dependencies
 
 | Package | Purpose |
-|---------|---------|
+|---|---|
 | `express` | HTTP server |
-| `multer` | Multipart file upload handling |
-| `sharp` | Image processing — JPEG/PNG/WebP/AVIF/GIF/TIFF (hot path) |
-| `@imagemagick/magick-wasm` | Image processing — HEIC, PSD, JPEG XL, BMP, and future format adds |
+| `multer` | Multipart upload handling |
+| `sharp` | Native image processing for the hot path |
+| `@imagemagick/magick-wasm` | WASM ImageMagick for the long-tail formats |
+
+### Contributing
+
+Pull requests welcome. For substantive changes (new features, architectural shifts), open an issue first to discuss the approach.
+
+The codebase aims to be readable without a deep dive — single-file frontend, single-file server, no transpilation step on the renderer side. If something feels mysterious, that's a documentation bug; let me know.
