@@ -72,11 +72,11 @@ docker compose down            # stop and remove
 
 ### Read (input)
 
-JPEG, PNG, WebP, AVIF, GIF, **HEIF/HEIC**, TIFF, BMP, **SVG**, **PSD**
+JPEG, PNG, WebP, AVIF, **JPEG XL**, GIF, **HEIF/HEIC**, TIFF, BMP, **SVG**, **PSD**
 
 ### Write (output)
 
-JPEG, PNG, WebP, AVIF, GIF, TIFF, BMP, ICO
+JPEG, PNG, WebP, AVIF, **JPEG XL**, GIF, TIFF, BMP, ICO
 
 ### Input-only formats
 
@@ -116,6 +116,15 @@ The frontend renders the options panel from a parallel config in
 `public/index.html`. Adding a future format is one entry on each side; the
 endpoint logic itself stays unchanged.
 
+**Hybrid decode/encode** (since v1.1): `sharp` handles the hot path — JPEG,
+PNG, WebP, AVIF, GIF, TIFF — at native libvips speed, including preserving
+the byte-identical WebP output guarantee across every release back to the
+original WEBPConvert. Everything else (HEIF/HEIC input, PSD, BMP, JPEG XL,
+and any future v1.x format like JP2/EXR/RAW) routes through `magick-wasm`,
+which exposes ~270 formats through one consistent decoder/encoder API.
+See `lib/magick.js` for the wrapper and `CHANGELOG.md` for the broader
+story of why it's structured this way.
+
 For format-specific implementation details and v1 decisions (per-file vs.
 global options, animation flattening, the HEIC licensing reasoning), see the
 inline comments in `server.js`.
@@ -126,7 +135,5 @@ inline comments in `server.js`.
 |---------|---------|
 | `express` | HTTP server |
 | `multer` | Multipart file upload handling |
-| `sharp` | Image processing, primary encoder |
-| `ag-psd` | PSD decode (flattened composite) |
-| `bmp-js` | BMP encode and decode |
-| `heic-decode` | HEIF/HEIC decode fallback when sharp's libheif lacks HEVC |
+| `sharp` | Image processing — JPEG/PNG/WebP/AVIF/GIF/TIFF (hot path) |
+| `@imagemagick/magick-wasm` | Image processing — HEIC, PSD, JPEG XL, BMP, and future format adds |

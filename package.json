@@ -1,6 +1,6 @@
 {
   "name": "localpix",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Local, offline image converter — batch-convert between JPEG, PNG, WebP, AVIF, GIF, TIFF, BMP, ICO and more.",
   "main": "electron/main.js",
   "scripts": {
@@ -30,6 +30,8 @@
     },
     "files": [
       "electron/**/*",
+      "lib/**/*",
+      "assets/**/*",
       "server.js",
       "public/**/*",
       "package.json"
