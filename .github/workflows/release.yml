@@ -47,6 +47,12 @@ env:
   # actions/cache works identically on macos and windows runners.
   ELECTRON_CACHE: ${{ github.workspace }}/.cache/electron
   ELECTRON_BUILDER_CACHE: ${{ github.workspace }}/.cache/electron-builder
+  # Force the JavaScript actions (checkout, cache, setup-node, upload-artifact)
+  # to use Node 24 instead of the deprecated Node 20 runtime. GitHub will make
+  # Node 24 the default on June 2nd, 2026; this opts us in early and silences
+  # the deprecation warning. Independent of the Node version used to run our
+  # build (that's controlled by setup-node's node-version input below).
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: 'true'
 
 jobs:
   # ---------------------------------------------------------------------------
