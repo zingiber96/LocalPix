@@ -6,7 +6,11 @@
   "scripts": {
     "start": "node server.js",
     "app": "electron .",
-    "dist": "electron-builder --mac"
+    "dist": "electron-builder --mac",
+    "dist:mac": "electron-builder --mac",
+    "dist:win": "electron-builder --win --x64",
+    "dist:win-all": "electron-builder --win --x64 --arm64",
+    "dist:all": "electron-builder --mac --win --x64"
   },
   "dependencies": {
     "@imagemagick/magick-wasm": "^0.0.40",
