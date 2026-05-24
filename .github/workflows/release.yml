@@ -60,12 +60,12 @@ jobs:
         include:
           - os: macos-latest
             target: macOS
-            script: dist:mac
+            builder_args: --mac
             artifact_glob: 'release/*.dmg'
             artifact_name: macos-dmg
           - os: windows-latest
             target: Windows
-            script: dist:win
+            builder_args: --win --x64
             artifact_glob: 'release/*.exe'
             artifact_name: windows-exe
     runs-on: ${{ matrix.os }}
@@ -109,7 +109,16 @@ jobs:
           fi
 
       - name: Build
-        run: npm run ${{ matrix.script }}
+        # Call electron-builder directly (not via npm run dist:*) for two reasons:
+        # 1. --publish never is mandatory in CI — without it, electron-builder
+        #    auto-detects CI and tries to publish to GitHub Releases itself,
+        #    which fails without GH_TOKEN. We handle publishing in the release
+        #    job below via softprops/action-gh-release.
+        # 2. On a Windows runner, the local dist:win script's _prep:win-x64
+        #    step is redundant — npm ci on Windows already fetches
+        #    sharp-win32-x64 naturally.
+        shell: bash
+        run: npx electron-builder ${{ matrix.builder_args }} --publish never
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
