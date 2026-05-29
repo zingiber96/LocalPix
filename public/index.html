@@ -686,6 +686,62 @@
       gap: 8px;
     }
 
+    /* Split button: primary action + dropdown for the alternative. */
+    .btn-split {
+      display: inline-flex;
+      position: relative;
+    }
+
+    .btn-split-primary {
+      border-top-right-radius: 0;
+      border-bottom-right-radius: 0;
+    }
+
+    .btn-split-toggle {
+      border-top-left-radius: 0;
+      border-bottom-left-radius: 0;
+      padding-left: 7px;
+      padding-right: 7px;
+      margin-left: 1px;
+      box-shadow: inset 1px 0 0 rgba(255, 255, 255, 0.18);
+    }
+
+    .btn-split-menu {
+      position: absolute;
+      top: calc(100% + 6px);
+      right: 0;
+      min-width: 200px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      box-shadow: 0 6px 20px rgba(0, 0, 0, 0.12);
+      padding: 4px;
+      z-index: 20;
+    }
+
+    .btn-split-menu[hidden] {
+      display: none;
+    }
+
+    .btn-split-menu-item {
+      background: transparent;
+      border: 0;
+      padding: 8px 12px;
+      border-radius: 5px;
+      cursor: pointer;
+      font-size: 12.5px;
+      font-weight: 500;
+      width: 100%;
+      text-align: left;
+      color: var(--text);
+      font-family: inherit;
+    }
+
+    .btn-split-menu-item:hover {
+      background: var(--surface-2);
+      color: var(--text);
+    }
+
     #file-list {
       display: flex;
       flex-direction: column;
@@ -1041,12 +1097,26 @@
       <span class="count" id="file-count"></span>
       <div class="batch-actions">
         <button class="btn btn-ghost btn-sm" id="clear-btn">Clear all</button>
-        <button class="btn btn-primary btn-sm" id="convert-all-btn" disabled>
-          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:12px;height:12px;">
-            <polyline points="3 8 7 12 13 4"/>
-          </svg>
-          Convert all
-        </button>
+        <!-- Split convert button: primary action label adapts to file state
+             (Convert N new / Reconvert N files / etc). When both a "convert
+             new" and "reconvert all" action are useful, the toggle ⌄ exposes
+             the alternative; otherwise the toggle is hidden. -->
+        <div class="btn-split" id="convert-split">
+          <button class="btn btn-primary btn-sm btn-split-primary" id="convert-primary-btn" disabled>
+            <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:12px;height:12px;">
+              <polyline points="3 8 7 12 13 4"/>
+            </svg>
+            <span id="convert-primary-label">Convert</span>
+          </button>
+          <button class="btn btn-primary btn-sm btn-split-toggle" id="convert-toggle-btn" aria-label="More convert options" aria-haspopup="menu" aria-expanded="false" style="display:none;">
+            <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" style="width:10px;height:10px;">
+              <polyline points="4 6 8 10 12 6"/>
+            </svg>
+          </button>
+          <div class="btn-split-menu" id="convert-menu" role="menu" hidden>
+            <button class="btn-split-menu-item" id="convert-alt-btn" role="menuitem"></button>
+          </div>
+        </div>
       </div>
     </div>
 
@@ -1194,7 +1264,12 @@
   const formatButtons      = document.getElementById('format-buttons');
   const formatDescription  = document.getElementById('format-description');
   const optionsPanel       = document.getElementById('options-panel');
-  const convertAllBtn      = document.getElementById('convert-all-btn');
+  const convertSplit       = document.getElementById('convert-split');
+  const convertPrimaryBtn  = document.getElementById('convert-primary-btn');
+  const convertPrimaryLbl  = document.getElementById('convert-primary-label');
+  const convertToggleBtn   = document.getElementById('convert-toggle-btn');
+  const convertMenu        = document.getElementById('convert-menu');
+  const convertAltBtn      = document.getElementById('convert-alt-btn');
   const clearBtn           = document.getElementById('clear-btn');
   const fileList           = document.getElementById('file-list');
   const emptyState         = document.getElementById('empty-state');
@@ -1263,7 +1338,34 @@
     fileInput.value = '';
   });
 
-  convertAllBtn.addEventListener('click', () => convertAll());
+  // Track which actions are currently bound to the primary + alt slots.
+  // Replaced wholesale by refreshConvertBatchButton() on every refresh().
+  let currentPrimaryAction = null;
+  let currentAltAction = null;
+
+  convertPrimaryBtn.addEventListener('click', () => {
+    if (currentPrimaryAction) currentPrimaryAction();
+  });
+  convertToggleBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    const open = !convertMenu.hidden;
+    convertMenu.hidden = open;
+    convertToggleBtn.setAttribute('aria-expanded', String(!open));
+  });
+  convertAltBtn.addEventListener('click', () => {
+    convertMenu.hidden = true;
+    convertToggleBtn.setAttribute('aria-expanded', 'false');
+    if (currentAltAction) currentAltAction();
+  });
+  // Close the alt menu on outside click. Captures on mousedown so a single
+  // click on the toggle (which fires the event above with stopPropagation)
+  // doesn't immediately re-close the menu it just opened.
+  document.addEventListener('mousedown', (e) => {
+    if (!convertSplit.contains(e.target) && !convertMenu.hidden) {
+      convertMenu.hidden = true;
+      convertToggleBtn.setAttribute('aria-expanded', 'false');
+    }
+  });
   clearBtn.addEventListener('click', () => clearAll());
 
   function defaultsFor(format) {
@@ -1600,10 +1702,74 @@
     refresh();
   }
 
-  async function convertAll() {
-    const pending = [...files.entries()].filter(([, e]) => e.state !== 'converting');
-    for (const [id] of pending) {
-      await convertFile(id);
+  // Convert only files that haven't been successfully converted yet
+  // (pending or previously errored). Used as the default action when the
+  // batch has any unconverted files.
+  async function convertNew() {
+    for (const [id, e] of files.entries()) {
+      if (e.state === 'pending' || e.state === 'error') {
+        await convertFile(id);
+      }
+    }
+  }
+
+  // Convert every file regardless of current state. Used as the default
+  // action when everything is already done (e.g. the user changed settings
+  // and wants to re-run), or available via the dropdown when there's a mix
+  // of new and done files.
+  async function reconvertAll() {
+    for (const [id, e] of files.entries()) {
+      if (e.state !== 'converting') {
+        await convertFile(id);
+      }
+    }
+  }
+
+  // Compute the right label + primary/alt actions for the split button
+  // based on the current file states. Called from refresh().
+  function refreshConvertBatchButton() {
+    let pending = 0, done = 0;
+    for (const e of files.values()) {
+      if (e.state === 'pending' || e.state === 'error') pending++;
+      else if (e.state === 'done') done++;
+    }
+    const total = pending + done;
+    const plural = (n) => n === 1 ? '' : 's';
+
+    convertMenu.hidden = true;
+    convertToggleBtn.setAttribute('aria-expanded', 'false');
+
+    if (total === 0) {
+      convertPrimaryBtn.disabled = true;
+      convertToggleBtn.style.display = 'none';
+      convertPrimaryLbl.textContent = 'Convert';
+      currentPrimaryAction = null;
+      currentAltAction = null;
+      return;
+    }
+
+    convertPrimaryBtn.disabled = false;
+
+    if (pending === total) {
+      // Fresh batch — everything still to do.
+      convertPrimaryLbl.textContent = `Convert ${pending} file${plural(pending)}`;
+      currentPrimaryAction = convertNew;
+      currentAltAction = null;
+      convertToggleBtn.style.display = 'none';
+    } else if (done === total) {
+      // Everything's converted — reconvert is the only useful batch action.
+      convertPrimaryLbl.textContent = `Reconvert all ${done} file${plural(done)}`;
+      currentPrimaryAction = reconvertAll;
+      currentAltAction = null;
+      convertToggleBtn.style.display = 'none';
+    } else {
+      // Mixed — Convert New is the default; offer Reconvert All as the alt.
+      convertPrimaryLbl.textContent = `Convert ${pending} new`;
+      currentPrimaryAction = convertNew;
+      convertAltBtn.textContent = `Reconvert all (${total})`;
+      currentAltAction = reconvertAll;
+      convertToggleBtn.style.display = '';
+      convertToggleBtn.disabled = false;
     }
   }
 
@@ -1627,7 +1793,7 @@
     emptyState.style.display = count === 0 ? 'block' : 'none';
     batchBar.style.display = count > 0 ? 'flex' : 'none';
     fileCount.textContent = `${count} file${count !== 1 ? 's' : ''}`;
-    convertAllBtn.disabled = count === 0;
+    refreshConvertBatchButton();
 
     // SVG density only visible when an SVG file is in the list.
     const hasSvg = [...files.values()].some((e) => e.kind === 'svg');
