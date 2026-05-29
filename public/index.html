@@ -1390,7 +1390,7 @@
   // Render the options panel based on the current target and known sources.
   function renderOptions() {
     const conf = FORMAT_OPTIONS[currentTarget];
-    optionsPanel.innerHTML = '';
+    optionsPanel.replaceChildren();
     if (!conf) return;
 
     const fields = [...conf.fields];
@@ -1423,85 +1423,100 @@
   }
 
   function renderField(f) {
-    const wrap = document.createElement('div');
-    wrap.className = 'control-group';
+    const wrap = el('div', { class: 'control-group' });
 
     if (f.type === 'slider') {
       const val = currentOpts[f.key] ?? f.def;
-      wrap.innerHTML = `
-        <label class="field-label">${escHtml(f.label)}</label>
-        <div class="slider-row">
-          <input type="range" min="${f.min}" max="${f.max}" value="${val}" />
-          <span class="slider-value">${val}</span>
-        </div>`;
-      const range = wrap.querySelector('input');
-      const display = wrap.querySelector('.slider-value');
-      range.addEventListener('input', () => {
-        currentOpts[f.key] = Number(range.value);
-        display.textContent = range.value;
+      const display = el('span', { class: 'slider-value', text: String(val) });
+      const range = el('input', {
+        type: 'range', min: f.min, max: f.max, value: val,
+        oninput: () => {
+          currentOpts[f.key] = Number(range.value);
+          display.textContent = range.value;
+        },
       });
+      wrap.append(
+        el('label', { class: 'field-label', text: f.label }),
+        el('div', { class: 'slider-row' }, range, display),
+      );
     } else if (f.type === 'checkbox') {
       const checked = currentOpts[f.key] ?? f.def;
-      wrap.innerHTML = `
-        <div class="checkbox-row">
-          <input type="checkbox" ${checked ? 'checked' : ''} id="cb-${f.key}" />
-          <label for="cb-${f.key}">${escHtml(f.label)}</label>
-        </div>`;
-      const cb = wrap.querySelector('input');
-      cb.addEventListener('change', () => {
-        currentOpts[f.key] = cb.checked;
-        renderOptions(); // re-render so show/hide rules apply (e.g. webp lossless)
+      const id = 'cb-' + f.key;
+      const cb = el('input', {
+        type: 'checkbox', id, checked: !!checked,
+        onchange: () => {
+          currentOpts[f.key] = cb.checked;
+          renderOptions(); // re-render so show/hide rules apply (e.g. webp lossless)
+        },
       });
+      wrap.append(
+        el('div', { class: 'checkbox-row' },
+          cb,
+          el('label', { for: id, text: f.label }),
+        ),
+      );
     } else if (f.type === 'select') {
-      wrap.innerHTML = `
-        <label class="field-label">${escHtml(f.label)}</label>
-        <select>
-          ${f.opts.map((o) =>
-            `<option value="${escHtml(o.value)}" ${currentOpts[f.key] === o.value ? 'selected' : ''}>
-              ${escHtml(o.label)}
-            </option>`).join('')}
-        </select>`;
-      const sel = wrap.querySelector('select');
-      sel.addEventListener('change', () => {
-        currentOpts[f.key] = sel.value;
-        renderOptions();
+      const sel = el('select', {
+        onchange: () => {
+          currentOpts[f.key] = sel.value;
+          renderOptions();
+        },
       });
+      for (const o of f.opts) {
+        sel.appendChild(el('option', {
+          value: o.value,
+          selected: currentOpts[f.key] === o.value,
+          text: o.label,
+        }));
+      }
+      wrap.append(
+        el('label', { class: 'field-label', text: f.label }),
+        sel,
+      );
     } else if (f.type === 'number') {
-      wrap.innerHTML = `
-        <label class="field-label">${escHtml(f.label)}</label>
-        <input type="number" min="${f.min ?? ''}" value="${currentOpts[f.key] ?? f.def}" />`;
-      const num = wrap.querySelector('input');
-      num.addEventListener('input', () => {
-        currentOpts[f.key] = Number(num.value);
+      const num = el('input', {
+        type: 'number',
+        min: f.min ?? '',
+        value: currentOpts[f.key] ?? f.def,
+        oninput: () => { currentOpts[f.key] = Number(num.value); },
       });
+      wrap.append(
+        el('label', { class: 'field-label', text: f.label }),
+        num,
+      );
     } else if (f.type === 'color') {
-      wrap.innerHTML = `
-        <label class="field-label">${escHtml(f.label)}</label>
-        <input type="color" value="${currentBackground}" />`;
-      const c = wrap.querySelector('input');
-      c.addEventListener('input', () => {
-        currentBackground = c.value;
-        currentOpts.background = c.value;
+      const c = el('input', {
+        type: 'color',
+        value: currentBackground,
+        oninput: () => {
+          currentBackground = c.value;
+          currentOpts.background = c.value;
+        },
       });
+      wrap.append(
+        el('label', { class: 'field-label', text: f.label }),
+        c,
+      );
       currentOpts.background = currentBackground;
     } else if (f.type === 'checklist') {
       const selected = new Set(currentOpts[f.key] ?? f.def);
-      wrap.innerHTML = `
-        <label class="field-label">${escHtml(f.label)}</label>
-        <div class="checklist">
-          ${f.opts.map((o) => `
-            <label>
-              <input type="checkbox" value="${o.value}" ${selected.has(o.value) ? 'checked' : ''} />
-              ${escHtml(o.label)}
-            </label>`).join('')}
-        </div>`;
-      wrap.querySelectorAll('input').forEach((cb) => {
-        cb.addEventListener('change', () => {
-          const checked = [...wrap.querySelectorAll('input:checked')]
-            .map((x) => Number(x.value));
-          currentOpts[f.key] = checked;
+      const list = el('div', { class: 'checklist' });
+      const cbs = [];
+      for (const o of f.opts) {
+        const cb = el('input', {
+          type: 'checkbox', value: o.value, checked: selected.has(o.value),
         });
-      });
+        cbs.push(cb);
+        list.appendChild(el('label', null, cb, ' ', String(o.label)));
+      }
+      const updateChecked = () => {
+        currentOpts[f.key] = cbs.filter((x) => x.checked).map((x) => Number(x.value));
+      };
+      for (const cb of cbs) cb.addEventListener('change', updateChecked);
+      wrap.append(
+        el('label', { class: 'field-label', text: f.label }),
+        list,
+      );
     }
 
     return wrap;
@@ -1541,39 +1556,40 @@
   }
 
   function createRow(id, file, kind) {
-    const row = document.createElement('div');
-    row.className = 'file-row';
-    row.dataset.id = id;
+    const closeIcon = svgEl('svg',
+      { viewBox: '0 0 16 16', fill: 'none', stroke: 'currentColor',
+        'stroke-width': 1.8, 'stroke-linecap': 'round' },
+      svgEl('path', { d: 'M4 4l8 8M12 4l-8 8' }),
+    );
 
-    const sizeStr = formatSize(file.size);
-    const kindLabel = kind.toUpperCase();
-
-    row.innerHTML = `
-      <div class="thumb-wrap"></div>
-      <div class="file-info">
-        <div class="file-name" title="${escHtml(file.name)}">${escHtml(file.name)}</div>
-        <div class="file-meta">
-          <span class="kind-label">${escHtml(kindLabel)}</span>
-          <span class="sep">·</span>
-          <span class="original-size">${sizeStr}</span>
-          <span class="result-info"></span>
-        </div>
-        <div class="file-notices"></div>
-      </div>
-      <div class="file-actions">
-        <div class="spinner"></div>
-        <span class="download-wrap"></span>
-        <button class="btn btn-secondary btn-sm convert-btn">Convert</button>
-        <button class="btn-icon remove-btn" aria-label="Remove">
-          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round">
-            <path d="M4 4l8 8M12 4l-8 8"/>
-          </svg>
-        </button>
-      </div>
-    `;
-
-    row.querySelector('.convert-btn').addEventListener('click', () => convertFile(id));
-    row.querySelector('.remove-btn').addEventListener('click', () => removeFile(id));
+    const row = el('div',
+      { class: 'file-row', dataset: { id: String(id) } },
+      el('div', { class: 'thumb-wrap' }),
+      el('div', { class: 'file-info' },
+        el('div', { class: 'file-name', title: file.name, text: file.name }),
+        el('div', { class: 'file-meta' },
+          el('span', { class: 'kind-label', text: kind.toUpperCase() }),
+          el('span', { class: 'sep', text: '·' }),
+          el('span', { class: 'original-size', text: formatSize(file.size) }),
+          el('span', { class: 'result-info' }),
+        ),
+        el('div', { class: 'file-notices' }),
+      ),
+      el('div', { class: 'file-actions' },
+        el('div', { class: 'spinner' }),
+        el('span', { class: 'download-wrap' }),
+        el('button', {
+          class: 'btn btn-secondary btn-sm convert-btn',
+          text: 'Convert',
+          onclick: () => convertFile(id),
+        }),
+        el('button',
+          { class: 'btn-icon remove-btn', 'aria-label': 'Remove',
+            onclick: () => removeFile(id) },
+          closeIcon,
+        ),
+      ),
+    );
 
     return row;
   }
@@ -1605,11 +1621,7 @@
       refreshFileNotices(); // ICO non-square notice needs real dimensions.
     };
     img.onerror = () => {
-      const placeholder = document.createElement('div');
-      placeholder.className = 'thumb-placeholder';
-      placeholder.textContent = kind.toUpperCase();
-      wrap.innerHTML = '';
-      wrap.appendChild(placeholder);
+      wrap.replaceChildren(el('div', { class: 'thumb-placeholder', text: kind.toUpperCase() }));
     };
     wrap.appendChild(img);
   }
@@ -1636,7 +1648,7 @@
         notices.push('Animated sources are flattened to the first frame in v1.');
       }
 
-      slot.innerHTML = notices.map((n) => `<span>• ${escHtml(n)}</span>`).join('');
+      slot.replaceChildren(...notices.map((n) => el('span', { text: '• ' + n })));
     }
   }
 
@@ -1680,30 +1692,45 @@
       const pct = data.originalSize > 0
         ? Math.round((savings / data.originalSize) * 100)
         : 0;
-      const savingsStr = savings > 0
-        ? `<span class="savings">↓ ${pct}% saved</span>`
-        : `<span style="color:var(--text-muted)">${pct === 0 ? 'same size' : '↑ larger'}</span>`;
+      const savingsNode = savings > 0
+        ? el('span', { class: 'savings', text: '↓ ' + pct + '% saved' })
+        : el('span',
+            { style: { color: 'var(--text-muted)' },
+              text: pct === 0 ? 'same size' : '↑ larger' });
 
-      row.querySelector('.result-info').innerHTML =
-        `<span class="arrow">→</span> ${formatSize(data.convertedSize)} <span class="sep">·</span> ${savingsStr}`;
+      row.querySelector('.result-info').replaceChildren(
+        el('span', { class: 'arrow', text: '→' }),
+        ' ',
+        formatSize(data.convertedSize),
+        ' ',
+        el('span', { class: 'sep', text: '·' }),
+        ' ',
+        savingsNode,
+      );
 
-      const wrap = row.querySelector('.download-wrap');
-      wrap.innerHTML = `<a class="download-link"
-        href="/api/download/${encodeURIComponent(data.convertedName)}"
-        download="${escHtml(data.convertedName)}">
-          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M8 2v9M4 7l4 4 4-4M3 13h10"/>
-          </svg>
-          Save
-        </a>`;
+      const downloadIcon = svgEl('svg',
+        { viewBox: '0 0 16 16', fill: 'none', stroke: 'currentColor',
+          'stroke-width': 1.8, 'stroke-linecap': 'round', 'stroke-linejoin': 'round' },
+        svgEl('path', { d: 'M8 2v9M4 7l4 4 4-4M3 13h10' }),
+      );
+      row.querySelector('.download-wrap').replaceChildren(
+        el('a',
+          { class: 'download-link',
+            href: '/api/download/' + encodeURIComponent(data.convertedName),
+            download: data.convertedName },
+          downloadIcon,
+          ' Save',
+        ),
+      );
 
       convertBtn.textContent = 'Reconvert';
       convertBtn.disabled = false;
     } catch (err) {
       entry.state = 'error';
       row.className = 'file-row error';
-      row.querySelector('.result-info').innerHTML =
-        `<span class="error-msg"> — ${escHtml(err.message)}</span>`;
+      row.querySelector('.result-info').replaceChildren(
+        el('span', { class: 'error-msg', text: ' — ' + err.message }),
+      );
       convertBtn.textContent = 'Retry';
       convertBtn.disabled = false;
     }
@@ -1795,7 +1822,7 @@
   }
 
   function clearAll() {
-    fileList.innerHTML = '';
+    fileList.replaceChildren();
     files.clear();
     refresh();
   }
@@ -1822,6 +1849,66 @@
     return `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
   }
 
+  // -- DOM helpers ----------------------------------------------------------
+  // el() and svgEl() build DOM trees the safe way — every attribute value
+  // and every text child goes through setAttribute / createTextNode, never
+  // through the HTML parser. This eliminates the XSS sink that string-
+  // interpolated innerHTML assignments represent, and closes CodeQL's "DOM
+  // text reinterpreted as HTML" alert class structurally.
+  //
+  // Usage:
+  //   el('div', {class: 'thumb-wrap'})
+  //   el('span', {class: 'kind-label'}, 'JPEG')
+  //   el('input', {type: 'range', min: 0, max: 100, value: 80,
+  //                oninput: e => console.log(e.target.value)})
+  //
+  // Convention: 'class' → className, 'text' → textContent, 'dataset' →
+  // dataset assign, onXxx → addEventListener, true → bare attribute,
+  // false/null → omitted.
+  function el(tag, attrs, ...children) {
+    const node = document.createElement(tag);
+    if (attrs) applyAttrs(node, attrs);
+    appendChildren(node, children);
+    return node;
+  }
+  const SVG_NS = 'http://www.w3.org/2000/svg';
+  function svgEl(tag, attrs, ...children) {
+    const node = document.createElementNS(SVG_NS, tag);
+    if (attrs) applyAttrs(node, attrs, /*svg*/ true);
+    appendChildren(node, children);
+    return node;
+  }
+  function applyAttrs(node, attrs, isSvg) {
+    for (const [k, v] of Object.entries(attrs)) {
+      if (v == null || v === false) continue;
+      if (k === 'class') node.setAttribute('class', String(v));
+      else if (k === 'text') node.textContent = String(v);
+      else if (k === 'dataset' && typeof v === 'object') Object.assign(node.dataset, v);
+      else if (k === 'style' && typeof v === 'object') Object.assign(node.style, v);
+      else if (k.startsWith('on') && typeof v === 'function') {
+        node.addEventListener(k.slice(2).toLowerCase(), v);
+      } else if (v === true) {
+        node.setAttribute(k, '');
+      } else {
+        node.setAttribute(k, String(v));
+      }
+    }
+  }
+  function appendChildren(node, children) {
+    for (const c of children) {
+      if (c == null || c === false) continue;
+      if (Array.isArray(c)) appendChildren(node, c);
+      else if (typeof c === 'string' || typeof c === 'number') {
+        node.appendChild(document.createTextNode(String(c)));
+      } else {
+        node.appendChild(c);
+      }
+    }
+  }
+
+  // escHtml is retained for backwards-compat with any future contributor
+  // who reaches for the old string-interpolation pattern; no live caller
+  // uses it after the v1.2 DOM-API refactor.
   function escHtml(str) {
     return String(str)
       .replace(/&/g, '&amp;')
