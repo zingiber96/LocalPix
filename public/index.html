@@ -697,6 +697,15 @@
       border-bottom-right-radius: 0;
     }
 
+    /* When there's no alternative action, the toggle ⌄ is hidden and the
+       primary button should look like a regular standalone button — restore
+       its right-side radius. The `.solo` class is added by the JS state
+       machine in refreshConvertBatchButton(). */
+    .btn-split.solo .btn-split-primary {
+      border-top-right-radius: var(--radius-sm);
+      border-bottom-right-radius: var(--radius-sm);
+    }
+
     .btn-split-toggle {
       border-top-left-radius: 0;
       border-bottom-left-radius: 0;
@@ -1742,6 +1751,7 @@
     if (total === 0) {
       convertPrimaryBtn.disabled = true;
       convertToggleBtn.style.display = 'none';
+      convertSplit.classList.add('solo');
       convertPrimaryLbl.textContent = 'Convert';
       currentPrimaryAction = null;
       currentAltAction = null;
@@ -1756,12 +1766,14 @@
       currentPrimaryAction = convertNew;
       currentAltAction = null;
       convertToggleBtn.style.display = 'none';
+      convertSplit.classList.add('solo');
     } else if (done === total) {
       // Everything's converted — reconvert is the only useful batch action.
       convertPrimaryLbl.textContent = `Reconvert all ${done} file${plural(done)}`;
       currentPrimaryAction = reconvertAll;
       currentAltAction = null;
       convertToggleBtn.style.display = 'none';
+      convertSplit.classList.add('solo');
     } else {
       // Mixed — Convert New is the default; offer Reconvert All as the alt.
       convertPrimaryLbl.textContent = `Convert ${pending} new`;
@@ -1770,6 +1782,7 @@
       currentAltAction = reconvertAll;
       convertToggleBtn.style.display = '';
       convertToggleBtn.disabled = false;
+      convertSplit.classList.remove('solo');
     }
   }
 
