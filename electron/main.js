@@ -155,8 +155,8 @@ ipcMain.handle('localpix:select-output-folder', () => pickOutputFolder());
 //
 // We lazy-load the NativeImages on first use; loading is cheap and doing it
 // upfront before app.whenReady would error.
-const DOCK_ICON_LIGHT_PATH = path.join(__dirname, '..', 'assets', 'dock-icon-light.png');
-const DOCK_ICON_DARK_PATH = path.join(__dirname, '..', 'assets', 'dock-icon-dark.png');
+const DOCK_ICON_LIGHT_PATH = path.join(__dirname, '..', 'build', 'icon.icns');
+const DOCK_ICON_DARK_PATH = path.join(__dirname, '..', 'build', 'icon-dark.icns');
 let _dockIconLight = null;
 let _dockIconDark = null;
 
