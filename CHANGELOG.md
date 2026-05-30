@@ -5,6 +5,68 @@ All notable changes to LocalPix will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project loosely follows [Semantic Versioning](https://semver.org/).
 
+## [1.2.0] — 2026-05-25
+
+### Added
+
+- **Transforms section.** A new collapsible section between Privacy and
+  Output folder gives you a real image-processing pipeline alongside the
+  format conversion:
+  - **Resize** with three modes — *Max dimension* (bounds the long edge,
+    preserves aspect), *Percentage*, and *Exact dimensions* (auto-crops to
+    fit). Optional *Allow upscale* toggle gates enlargement on the first
+    two modes; Exact always allows it.
+  - **Rotate** in fixed 90° / 180° / 270° increments.
+  - **Flip horizontal** and **flip vertical** as independent toggles.
+  - **Crop to aspect** — 1:1, 4:3, 3:2, 16:9, or a custom W:H. Center crop
+    only in v1.2; manual crop boxes are slated for v1.3.
+  - **Resample kernel** selector — Lanczos 3 (default), Lanczos 2,
+    Mitchell, Cubic, or Nearest (sharp pixels). Only enabled when a resize
+    is active.
+  - A live **"Resulting dimensions"** preview computed from the first file
+    in the list. Per-file row notice describes the active transforms.
+    Reset button restores all controls to defaults.
+- **Smart-label Convert button.** Replaces the old "Convert all" with a
+  context-aware split button. Labels as `Convert N new` when there are
+  unconverted files and offers `Reconvert all` via the dropdown when both
+  actions are useful; `Reconvert all N files` when everything's already
+  done. Per-row Convert / Reconvert buttons unchanged.
+- **MIT LICENSE** file (the v1.1.1 commit added the field to `package.json`;
+  this surfaces the full text at the repo root).
+- **GitHub Actions CI workflow** (`.github/workflows/ci.yml`). Runs on PRs
+  to `main` and direct pushes to `main`: `npm ci`, syntax check for every
+  JS entrypoint, and a module-load smoke test that catches polyfill
+  regressions and missing-dep issues without needing fixture binaries.
+
+### Changed
+
+- **DOM-API refactor of `public/index.html`.** All fourteen `innerHTML =`
+  string-interpolation assignments replaced with explicit DOM construction
+  via two small `el()` / `svgEl()` helpers. Every attribute and text node
+  now flows through `setAttribute` / `createTextNode`, never through the
+  HTML parser. Closes the three CodeQL "DOM text reinterpreted as HTML"
+  alerts structurally instead of by dismissal, and removes a class of
+  future XSS risk if anyone forgets the escape convention in a PR.
+
+### Notes / deferred
+
+- **RAW camera input** (NEF / CR2 / CR3 / DNG / ARW / ORF / RW2 / RAF) was
+  investigated as a v1.2 stretch goal and deferred. magick-wasm accepts
+  RAW files but only extracts the small embedded preview thumbnail
+  (typically 160×120 from a 33 MB NEF), not the full demosaiced sensor
+  data. Shipping that would surprise users expecting their full image.
+  RAW returns when a real decoder (libraw-wasm or similar) lands.
+- **Manual crop boxes** (drag-to-crop overlay) stay on the v1.3 docket.
+
+### Preserved
+
+- WebP byte-identical output guarantee — verified again with transforms
+  field absent and with empty `{}`, both produce the same SHA-256 as the
+  pre-LocalPix reference.
+- All v1.1 capabilities: formats, metadata toggles, output folder picker,
+  drag-and-drop, batch convert, ICO multi-size, SVG density, JPEG alpha
+  flatten (which was re-tested across all four transform combinations).
+
 ## [1.1.1] — 2026-05-24
 
 ### Security

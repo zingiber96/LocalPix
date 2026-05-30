@@ -72,6 +72,11 @@ const INPUT_MIMES = new Set([
   'image/vnd.adobe.photoshop', 'application/x-photoshop',
   'application/photoshop', 'application/psd', 'image/x-photoshop',
   'image/jxl',
+  // Note: RAW camera formats (NEF/CR2/DNG/ARW/etc.) were investigated for
+  // v1.2 — magick-wasm "accepts" them but only extracts the tiny embedded
+  // preview (typically 160×120), not the full demosaiced sensor data. That
+  // would surprise users expecting their full image, so RAW input stays
+  // deferred until we wire a real RAW decoder (libraw-wasm or similar).
 ]);
 const INPUT_EXTS = new Set([
   '.jpg', '.jpeg', '.png', '.webp', '.avif', '.gif',
