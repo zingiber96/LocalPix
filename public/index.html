@@ -1486,9 +1486,8 @@
     <div class="output-row" id="output-folder-row">
       <span class="output-label">Output folder</span>
       <code id="output-folder-path" title="">…</code>
-      <button class="btn btn-secondary btn-sm" id="change-folder-btn" style="display:none;">
-        Change…
-      </button>
+      <button class="btn btn-secondary btn-sm" id="open-folder-btn" style="display:none;">Open folder</button>
+      <button class="btn btn-secondary btn-sm" id="change-folder-btn" style="display:none;">Change…</button>
     </div>
   </section>
 
@@ -2602,7 +2601,8 @@
   // Electron mode (window.localpix exists via preload): shows the current
   // folder and exposes a "Change…" button that triggers the native picker.
   const outputFolderPathEl = document.getElementById('output-folder-path');
-  const changeFolderBtn = document.getElementById('change-folder-btn');
+  const openFolderBtn     = document.getElementById('open-folder-btn');
+  const changeFolderBtn   = document.getElementById('change-folder-btn');
 
   function setOutputFolderDisplay(path) {
     outputFolderPathEl.textContent = path || '(unknown)';
@@ -2615,6 +2615,7 @@
       const cfg = await resp.json();
       setOutputFolderDisplay(cfg.outputDir);
       if (window.localpix && cfg.electron) {
+        openFolderBtn.style.display   = '';
         changeFolderBtn.style.display = '';
       }
     } catch (e) {
@@ -2624,6 +2625,13 @@
     }
 
     if (window.localpix) {
+      openFolderBtn.addEventListener('click', async () => {
+        try {
+          await window.localpix.openOutputFolder();
+        } catch (e) {
+          alert(`Could not open output folder: ${e.message}`);
+        }
+      });
       changeFolderBtn.addEventListener('click', async () => {
         try {
           const newPath = await window.localpix.selectOutputFolder();

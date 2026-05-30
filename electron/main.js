@@ -145,8 +145,9 @@ async function pickOutputFolder() {
 // IPC handlers exposed via the preload script's contextBridge. Channel names
 // are prefixed with 'localpix:' so they don't collide with channels from
 // other Electron apps if anything ever inspects them globally.
-ipcMain.handle('localpix:get-output-folder', () => getOutputDir());
+ipcMain.handle('localpix:get-output-folder',    () => getOutputDir());
 ipcMain.handle('localpix:select-output-folder', () => pickOutputFolder());
+ipcMain.handle('localpix:open-output-folder',   () => shell.openPath(getOutputDir()));
 
 // macOS Dock icon — swap between light and dark variants when the system
 // appearance changes. This only affects the live Dock icon; the Finder /
