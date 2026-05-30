@@ -2209,9 +2209,23 @@
     // Options panel node created early so format-button closures can reference it
     const optsPanel = el('div', { class: 'file-opts-panel' });
 
+    // Rebuild only the options panel. Does NOT call updateRowOverrideUI —
+    // that would re-enter buildDrawerContent for open drawers and recurse.
     function rebuildOpts() {
       buildOptionsPanel(optsPanel, override.target, override.opts, rebuildOpts);
-      updateRowOverrideUI(id, entry);
+    }
+
+    // Refresh the override-bar badge text without triggering a drawer rebuild.
+    function refreshBadge() {
+      const bar = entry.rowEl.querySelector('.override-bar');
+      if (bar.hidden) return;
+      const txDesc = describeActiveTransforms(override.transforms);
+      bar.replaceChildren(
+        el('span', { class: 'override-badge', text: override.target.toUpperCase() }),
+        el('span', { class: 'override-info', text: txDesc || 'custom settings' }),
+        el('button', { class: 'btn-revert', text: 'Reset',
+          onclick: () => resetFileToDefaults(id) }),
+      );
     }
 
     // -- Format selector
@@ -2239,6 +2253,7 @@
             b.setAttribute('aria-checked', String(active));
           });
           rebuildOpts();
+          refreshBadge();
         },
       }));
     }
