@@ -555,6 +555,160 @@
       border-left: 2px solid var(--border-strong);
     }
 
+    /* --- Transforms section ------------------------------------------- */
+
+    .transforms-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+    }
+
+    .transforms-toggle {
+      background: transparent;
+      border: 0;
+      padding: 4px 0;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      color: var(--text-muted);
+      font-family: inherit;
+    }
+    .transforms-toggle:hover { color: var(--text); }
+
+    .transforms-chevron {
+      width: 12px;
+      height: 12px;
+      transition: transform 0.15s ease;
+    }
+    .transforms-toggle[aria-expanded="true"] .transforms-chevron {
+      transform: rotate(-180deg);
+    }
+
+    .transforms-label {
+      margin: 0;
+      padding: 0;
+    }
+
+    .transforms-badge {
+      display: inline-flex;
+      align-items: center;
+      padding: 2px 8px;
+      font-size: 10.5px;
+      font-weight: 600;
+      letter-spacing: 0;
+      text-transform: none;
+      color: var(--accent);
+      background: color-mix(in oklab, var(--accent) 14%, transparent);
+      border-radius: 999px;
+    }
+    .transforms-badge[hidden] { display: none; }
+
+    .transforms-body {
+      margin-top: 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+    .transforms-body[hidden] { display: none; }
+
+    .transforms-row {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .transforms-row > .field-label {
+      margin: 0;
+    }
+
+    .transforms-segmented {
+      display: inline-flex;
+      gap: 2px;
+      background: var(--surface-2);
+      padding: 3px;
+      border-radius: var(--radius-sm);
+      border: 1px solid var(--border);
+      align-self: flex-start;
+    }
+    .transforms-seg-btn {
+      background: transparent;
+      border: 1px solid transparent;
+      padding: 5px 10px;
+      border-radius: 4px;
+      font-size: 11.5px;
+      font-weight: 500;
+      color: var(--text-muted);
+      cursor: pointer;
+      font-family: inherit;
+      white-space: nowrap;
+      transition: background-color 0.12s, color 0.12s, border-color 0.12s;
+    }
+    .transforms-seg-btn:hover {
+      color: var(--text);
+      background: var(--surface);
+    }
+    .transforms-seg-btn.active {
+      background: var(--surface);
+      color: var(--accent);
+      border-color: var(--border-strong);
+    }
+
+    .resize-inputs {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      flex-wrap: wrap;
+    }
+    .resize-inputs[hidden] { display: none; }
+    .resize-inputs input[type="number"] {
+      width: 88px;
+    }
+    .resize-sep {
+      color: var(--text-muted);
+      font-size: 12.5px;
+    }
+    .resize-unit {
+      color: var(--text-muted);
+      font-size: 11.5px;
+    }
+
+    .resize-upscale-row[hidden] { display: none; }
+
+    .resize-preview {
+      font-size: 11.5px;
+      color: var(--text-muted);
+      font-style: italic;
+    }
+    .resize-preview[hidden] { display: none; }
+
+    .flip-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px 18px;
+    }
+
+    .transforms-aspect-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+    .transforms-aspect-row select { width: auto; min-width: 180px; }
+
+    .crop-custom-inputs {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .crop-custom-inputs[hidden] { display: none; }
+    .crop-custom-inputs input[type="number"] {
+      width: 64px;
+    }
+
+    #resample-kernel { width: auto; min-width: 220px; }
+    #resample-kernel:disabled { opacity: 0.6; }
+
     /* --- Output folder row --------------------------------------------- */
 
     .output-row {
@@ -684,6 +838,71 @@
     .batch-actions {
       display: flex;
       gap: 8px;
+    }
+
+    /* Split button: primary action + dropdown for the alternative. */
+    .btn-split {
+      display: inline-flex;
+      position: relative;
+    }
+
+    .btn-split-primary {
+      border-top-right-radius: 0;
+      border-bottom-right-radius: 0;
+    }
+
+    /* When there's no alternative action, the toggle ⌄ is hidden and the
+       primary button should look like a regular standalone button — restore
+       its right-side radius. The `.solo` class is added by the JS state
+       machine in refreshConvertBatchButton(). */
+    .btn-split.solo .btn-split-primary {
+      border-top-right-radius: var(--radius-sm);
+      border-bottom-right-radius: var(--radius-sm);
+    }
+
+    .btn-split-toggle {
+      border-top-left-radius: 0;
+      border-bottom-left-radius: 0;
+      padding-left: 7px;
+      padding-right: 7px;
+      margin-left: 1px;
+      box-shadow: inset 1px 0 0 rgba(255, 255, 255, 0.18);
+    }
+
+    .btn-split-menu {
+      position: absolute;
+      top: calc(100% + 6px);
+      right: 0;
+      min-width: 200px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      box-shadow: 0 6px 20px rgba(0, 0, 0, 0.12);
+      padding: 4px;
+      z-index: 20;
+    }
+
+    .btn-split-menu[hidden] {
+      display: none;
+    }
+
+    .btn-split-menu-item {
+      background: transparent;
+      border: 0;
+      padding: 8px 12px;
+      border-radius: 5px;
+      cursor: pointer;
+      font-size: 12.5px;
+      font-weight: 500;
+      width: 100%;
+      text-align: left;
+      color: var(--text);
+      font-family: inherit;
+    }
+
+    .btn-split-menu-item:hover {
+      background: var(--surface-2);
+      color: var(--text);
     }
 
     #file-list {
@@ -1024,6 +1243,113 @@
     </div>
   </section>
 
+  <!-- Transforms ------------------------------------------------------- -->
+  <!-- Collapsible section for resize / rotate / flip / crop / resample.
+       Collapsed by default; a badge in the header signals when any
+       transform is non-default. Per-row notices appear on file rows when
+       transforms are active. -->
+  <section class="section transforms-section">
+    <div class="transforms-header">
+      <button class="transforms-toggle" id="transforms-toggle" type="button" aria-expanded="false" aria-controls="transforms-body">
+        <svg class="transforms-chevron" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="3 4.5 6 7.5 9 4.5"/>
+        </svg>
+        <span class="section-label transforms-label">Transforms</span>
+        <span class="transforms-badge" id="transforms-badge" hidden>0 active</span>
+      </button>
+      <button class="btn btn-ghost btn-sm" id="transforms-reset" type="button" hidden>Reset</button>
+    </div>
+
+    <div class="transforms-body" id="transforms-body" hidden>
+
+      <!-- Resize -->
+      <div class="transforms-row">
+        <div class="field-label">Resize</div>
+        <div class="transforms-segmented" id="resize-mode-buttons" role="radiogroup" aria-label="Resize mode">
+          <button class="transforms-seg-btn active" data-mode="none" type="button" role="radio" aria-checked="true">None</button>
+          <button class="transforms-seg-btn" data-mode="max" type="button" role="radio">Max dim</button>
+          <button class="transforms-seg-btn" data-mode="percentage" type="button" role="radio">Percentage</button>
+          <button class="transforms-seg-btn" data-mode="exact" type="button" role="radio">Exact</button>
+        </div>
+        <div class="resize-inputs" id="resize-inputs-max" hidden>
+          <input type="number" id="resize-max-w" min="1" placeholder="W" />
+          <span class="resize-sep">×</span>
+          <input type="number" id="resize-max-h" min="1" placeholder="H" />
+          <span class="resize-unit">px (bound the long edge)</span>
+        </div>
+        <div class="resize-inputs" id="resize-inputs-percentage" hidden>
+          <input type="number" id="resize-pct" min="1" max="1000" value="100" />
+          <span class="resize-unit">%</span>
+        </div>
+        <div class="resize-inputs" id="resize-inputs-exact" hidden>
+          <input type="number" id="resize-exact-w" min="1" placeholder="W" />
+          <span class="resize-sep">×</span>
+          <input type="number" id="resize-exact-h" min="1" placeholder="H" />
+          <span class="resize-unit">px (will crop to match)</span>
+        </div>
+        <div class="checkbox-row no-pad resize-upscale-row" id="resize-upscale-row" hidden>
+          <input type="checkbox" id="resize-upscale" />
+          <label for="resize-upscale">Allow upscale (default off)</label>
+        </div>
+        <div class="resize-preview" id="resize-preview" hidden></div>
+      </div>
+
+      <!-- Rotate / flip -->
+      <div class="transforms-row">
+        <div class="field-label">Rotate &amp; flip</div>
+        <div class="transforms-segmented" id="rotate-buttons" role="radiogroup" aria-label="Rotation">
+          <button class="transforms-seg-btn active" data-rotate="0" type="button" role="radio" aria-checked="true">0°</button>
+          <button class="transforms-seg-btn" data-rotate="90" type="button" role="radio">90°</button>
+          <button class="transforms-seg-btn" data-rotate="180" type="button" role="radio">180°</button>
+          <button class="transforms-seg-btn" data-rotate="270" type="button" role="radio">270°</button>
+        </div>
+        <div class="flip-row">
+          <div class="checkbox-row no-pad">
+            <input type="checkbox" id="flip-horizontal" />
+            <label for="flip-horizontal">Flip horizontal</label>
+          </div>
+          <div class="checkbox-row no-pad">
+            <input type="checkbox" id="flip-vertical" />
+            <label for="flip-vertical">Flip vertical</label>
+          </div>
+        </div>
+      </div>
+
+      <!-- Crop -->
+      <div class="transforms-row">
+        <div class="field-label">Crop to aspect</div>
+        <div class="transforms-aspect-row">
+          <select id="crop-aspect">
+            <option value="none" selected>None</option>
+            <option value="1:1">1:1 (square)</option>
+            <option value="4:3">4:3</option>
+            <option value="3:2">3:2</option>
+            <option value="16:9">16:9</option>
+            <option value="custom">Custom…</option>
+          </select>
+          <div class="crop-custom-inputs" id="crop-custom-inputs" hidden>
+            <input type="number" id="crop-custom-w" min="1" placeholder="W" />
+            <span class="resize-sep">:</span>
+            <input type="number" id="crop-custom-h" min="1" placeholder="H" />
+          </div>
+        </div>
+      </div>
+
+      <!-- Resample kernel -->
+      <div class="transforms-row">
+        <div class="field-label">Resample kernel</div>
+        <select id="resample-kernel" disabled>
+          <option value="lanczos3" selected>Lanczos 3 (default)</option>
+          <option value="lanczos2">Lanczos 2</option>
+          <option value="mitchell">Mitchell</option>
+          <option value="cubic">Cubic</option>
+          <option value="nearest">Nearest (sharp pixels)</option>
+        </select>
+      </div>
+
+    </div>
+  </section>
+
   <!-- Output folder ---------------------------------------------------- -->
   <section class="section">
     <div class="output-row" id="output-folder-row">
@@ -1041,12 +1367,26 @@
       <span class="count" id="file-count"></span>
       <div class="batch-actions">
         <button class="btn btn-ghost btn-sm" id="clear-btn">Clear all</button>
-        <button class="btn btn-primary btn-sm" id="convert-all-btn" disabled>
-          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:12px;height:12px;">
-            <polyline points="3 8 7 12 13 4"/>
-          </svg>
-          Convert all
-        </button>
+        <!-- Split convert button: primary action label adapts to file state
+             (Convert N new / Reconvert N files / etc). When both a "convert
+             new" and "reconvert all" action are useful, the toggle ⌄ exposes
+             the alternative; otherwise the toggle is hidden. -->
+        <div class="btn-split" id="convert-split">
+          <button class="btn btn-primary btn-sm btn-split-primary" id="convert-primary-btn" disabled>
+            <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:12px;height:12px;">
+              <polyline points="3 8 7 12 13 4"/>
+            </svg>
+            <span id="convert-primary-label">Convert</span>
+          </button>
+          <button class="btn btn-primary btn-sm btn-split-toggle" id="convert-toggle-btn" aria-label="More convert options" aria-haspopup="menu" aria-expanded="false" style="display:none;">
+            <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" style="width:10px;height:10px;">
+              <polyline points="4 6 8 10 12 6"/>
+            </svg>
+          </button>
+          <div class="btn-split-menu" id="convert-menu" role="menu" hidden>
+            <button class="btn-split-menu-item" id="convert-alt-btn" role="menuitem"></button>
+          </div>
+        </div>
       </div>
     </div>
 
@@ -1055,7 +1395,7 @@
   </section>
 
   <footer class="app-footer">
-    LocalPix · v1.1.1 · offline image converter
+    LocalPix · v1.2.0 · offline image converter
   </footer>
 
 </div>
@@ -1194,7 +1534,12 @@
   const formatButtons      = document.getElementById('format-buttons');
   const formatDescription  = document.getElementById('format-description');
   const optionsPanel       = document.getElementById('options-panel');
-  const convertAllBtn      = document.getElementById('convert-all-btn');
+  const convertSplit       = document.getElementById('convert-split');
+  const convertPrimaryBtn  = document.getElementById('convert-primary-btn');
+  const convertPrimaryLbl  = document.getElementById('convert-primary-label');
+  const convertToggleBtn   = document.getElementById('convert-toggle-btn');
+  const convertMenu        = document.getElementById('convert-menu');
+  const convertAltBtn      = document.getElementById('convert-alt-btn');
   const clearBtn           = document.getElementById('clear-btn');
   const fileList           = document.getElementById('file-list');
   const emptyState         = document.getElementById('empty-state');
@@ -1263,7 +1608,34 @@
     fileInput.value = '';
   });
 
-  convertAllBtn.addEventListener('click', () => convertAll());
+  // Track which actions are currently bound to the primary + alt slots.
+  // Replaced wholesale by refreshConvertBatchButton() on every refresh().
+  let currentPrimaryAction = null;
+  let currentAltAction = null;
+
+  convertPrimaryBtn.addEventListener('click', () => {
+    if (currentPrimaryAction) currentPrimaryAction();
+  });
+  convertToggleBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    const open = !convertMenu.hidden;
+    convertMenu.hidden = open;
+    convertToggleBtn.setAttribute('aria-expanded', String(!open));
+  });
+  convertAltBtn.addEventListener('click', () => {
+    convertMenu.hidden = true;
+    convertToggleBtn.setAttribute('aria-expanded', 'false');
+    if (currentAltAction) currentAltAction();
+  });
+  // Close the alt menu on outside click. Captures on mousedown so a single
+  // click on the toggle (which fires the event above with stopPropagation)
+  // doesn't immediately re-close the menu it just opened.
+  document.addEventListener('mousedown', (e) => {
+    if (!convertSplit.contains(e.target) && !convertMenu.hidden) {
+      convertMenu.hidden = true;
+      convertToggleBtn.setAttribute('aria-expanded', 'false');
+    }
+  });
   clearBtn.addEventListener('click', () => clearAll());
 
   function defaultsFor(format) {
@@ -1279,7 +1651,7 @@
   // Render the options panel based on the current target and known sources.
   function renderOptions() {
     const conf = FORMAT_OPTIONS[currentTarget];
-    optionsPanel.innerHTML = '';
+    optionsPanel.replaceChildren();
     if (!conf) return;
 
     const fields = [...conf.fields];
@@ -1312,85 +1684,100 @@
   }
 
   function renderField(f) {
-    const wrap = document.createElement('div');
-    wrap.className = 'control-group';
+    const wrap = el('div', { class: 'control-group' });
 
     if (f.type === 'slider') {
       const val = currentOpts[f.key] ?? f.def;
-      wrap.innerHTML = `
-        <label class="field-label">${escHtml(f.label)}</label>
-        <div class="slider-row">
-          <input type="range" min="${f.min}" max="${f.max}" value="${val}" />
-          <span class="slider-value">${val}</span>
-        </div>`;
-      const range = wrap.querySelector('input');
-      const display = wrap.querySelector('.slider-value');
-      range.addEventListener('input', () => {
-        currentOpts[f.key] = Number(range.value);
-        display.textContent = range.value;
+      const display = el('span', { class: 'slider-value', text: String(val) });
+      const range = el('input', {
+        type: 'range', min: f.min, max: f.max, value: val,
+        oninput: () => {
+          currentOpts[f.key] = Number(range.value);
+          display.textContent = range.value;
+        },
       });
+      wrap.append(
+        el('label', { class: 'field-label', text: f.label }),
+        el('div', { class: 'slider-row' }, range, display),
+      );
     } else if (f.type === 'checkbox') {
       const checked = currentOpts[f.key] ?? f.def;
-      wrap.innerHTML = `
-        <div class="checkbox-row">
-          <input type="checkbox" ${checked ? 'checked' : ''} id="cb-${f.key}" />
-          <label for="cb-${f.key}">${escHtml(f.label)}</label>
-        </div>`;
-      const cb = wrap.querySelector('input');
-      cb.addEventListener('change', () => {
-        currentOpts[f.key] = cb.checked;
-        renderOptions(); // re-render so show/hide rules apply (e.g. webp lossless)
+      const id = 'cb-' + f.key;
+      const cb = el('input', {
+        type: 'checkbox', id, checked: !!checked,
+        onchange: () => {
+          currentOpts[f.key] = cb.checked;
+          renderOptions(); // re-render so show/hide rules apply (e.g. webp lossless)
+        },
       });
+      wrap.append(
+        el('div', { class: 'checkbox-row' },
+          cb,
+          el('label', { for: id, text: f.label }),
+        ),
+      );
     } else if (f.type === 'select') {
-      wrap.innerHTML = `
-        <label class="field-label">${escHtml(f.label)}</label>
-        <select>
-          ${f.opts.map((o) =>
-            `<option value="${escHtml(o.value)}" ${currentOpts[f.key] === o.value ? 'selected' : ''}>
-              ${escHtml(o.label)}
-            </option>`).join('')}
-        </select>`;
-      const sel = wrap.querySelector('select');
-      sel.addEventListener('change', () => {
-        currentOpts[f.key] = sel.value;
-        renderOptions();
+      const sel = el('select', {
+        onchange: () => {
+          currentOpts[f.key] = sel.value;
+          renderOptions();
+        },
       });
+      for (const o of f.opts) {
+        sel.appendChild(el('option', {
+          value: o.value,
+          selected: currentOpts[f.key] === o.value,
+          text: o.label,
+        }));
+      }
+      wrap.append(
+        el('label', { class: 'field-label', text: f.label }),
+        sel,
+      );
     } else if (f.type === 'number') {
-      wrap.innerHTML = `
-        <label class="field-label">${escHtml(f.label)}</label>
-        <input type="number" min="${f.min ?? ''}" value="${currentOpts[f.key] ?? f.def}" />`;
-      const num = wrap.querySelector('input');
-      num.addEventListener('input', () => {
-        currentOpts[f.key] = Number(num.value);
+      const num = el('input', {
+        type: 'number',
+        min: f.min ?? '',
+        value: currentOpts[f.key] ?? f.def,
+        oninput: () => { currentOpts[f.key] = Number(num.value); },
       });
+      wrap.append(
+        el('label', { class: 'field-label', text: f.label }),
+        num,
+      );
     } else if (f.type === 'color') {
-      wrap.innerHTML = `
-        <label class="field-label">${escHtml(f.label)}</label>
-        <input type="color" value="${currentBackground}" />`;
-      const c = wrap.querySelector('input');
-      c.addEventListener('input', () => {
-        currentBackground = c.value;
-        currentOpts.background = c.value;
+      const c = el('input', {
+        type: 'color',
+        value: currentBackground,
+        oninput: () => {
+          currentBackground = c.value;
+          currentOpts.background = c.value;
+        },
       });
+      wrap.append(
+        el('label', { class: 'field-label', text: f.label }),
+        c,
+      );
       currentOpts.background = currentBackground;
     } else if (f.type === 'checklist') {
       const selected = new Set(currentOpts[f.key] ?? f.def);
-      wrap.innerHTML = `
-        <label class="field-label">${escHtml(f.label)}</label>
-        <div class="checklist">
-          ${f.opts.map((o) => `
-            <label>
-              <input type="checkbox" value="${o.value}" ${selected.has(o.value) ? 'checked' : ''} />
-              ${escHtml(o.label)}
-            </label>`).join('')}
-        </div>`;
-      wrap.querySelectorAll('input').forEach((cb) => {
-        cb.addEventListener('change', () => {
-          const checked = [...wrap.querySelectorAll('input:checked')]
-            .map((x) => Number(x.value));
-          currentOpts[f.key] = checked;
+      const list = el('div', { class: 'checklist' });
+      const cbs = [];
+      for (const o of f.opts) {
+        const cb = el('input', {
+          type: 'checkbox', value: o.value, checked: selected.has(o.value),
         });
-      });
+        cbs.push(cb);
+        list.appendChild(el('label', null, cb, ' ', String(o.label)));
+      }
+      const updateChecked = () => {
+        currentOpts[f.key] = cbs.filter((x) => x.checked).map((x) => Number(x.value));
+      };
+      for (const cb of cbs) cb.addEventListener('change', updateChecked);
+      wrap.append(
+        el('label', { class: 'field-label', text: f.label }),
+        list,
+      );
     }
 
     return wrap;
@@ -1430,39 +1817,40 @@
   }
 
   function createRow(id, file, kind) {
-    const row = document.createElement('div');
-    row.className = 'file-row';
-    row.dataset.id = id;
+    const closeIcon = svgEl('svg',
+      { viewBox: '0 0 16 16', fill: 'none', stroke: 'currentColor',
+        'stroke-width': 1.8, 'stroke-linecap': 'round' },
+      svgEl('path', { d: 'M4 4l8 8M12 4l-8 8' }),
+    );
 
-    const sizeStr = formatSize(file.size);
-    const kindLabel = kind.toUpperCase();
-
-    row.innerHTML = `
-      <div class="thumb-wrap"></div>
-      <div class="file-info">
-        <div class="file-name" title="${escHtml(file.name)}">${escHtml(file.name)}</div>
-        <div class="file-meta">
-          <span class="kind-label">${escHtml(kindLabel)}</span>
-          <span class="sep">·</span>
-          <span class="original-size">${sizeStr}</span>
-          <span class="result-info"></span>
-        </div>
-        <div class="file-notices"></div>
-      </div>
-      <div class="file-actions">
-        <div class="spinner"></div>
-        <span class="download-wrap"></span>
-        <button class="btn btn-secondary btn-sm convert-btn">Convert</button>
-        <button class="btn-icon remove-btn" aria-label="Remove">
-          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round">
-            <path d="M4 4l8 8M12 4l-8 8"/>
-          </svg>
-        </button>
-      </div>
-    `;
-
-    row.querySelector('.convert-btn').addEventListener('click', () => convertFile(id));
-    row.querySelector('.remove-btn').addEventListener('click', () => removeFile(id));
+    const row = el('div',
+      { class: 'file-row', dataset: { id: String(id) } },
+      el('div', { class: 'thumb-wrap' }),
+      el('div', { class: 'file-info' },
+        el('div', { class: 'file-name', title: file.name, text: file.name }),
+        el('div', { class: 'file-meta' },
+          el('span', { class: 'kind-label', text: kind.toUpperCase() }),
+          el('span', { class: 'sep', text: '·' }),
+          el('span', { class: 'original-size', text: formatSize(file.size) }),
+          el('span', { class: 'result-info' }),
+        ),
+        el('div', { class: 'file-notices' }),
+      ),
+      el('div', { class: 'file-actions' },
+        el('div', { class: 'spinner' }),
+        el('span', { class: 'download-wrap' }),
+        el('button', {
+          class: 'btn btn-secondary btn-sm convert-btn',
+          text: 'Convert',
+          onclick: () => convertFile(id),
+        }),
+        el('button',
+          { class: 'btn-icon remove-btn', 'aria-label': 'Remove',
+            onclick: () => removeFile(id) },
+          closeIcon,
+        ),
+      ),
+    );
 
     return row;
   }
@@ -1494,11 +1882,7 @@
       refreshFileNotices(); // ICO non-square notice needs real dimensions.
     };
     img.onerror = () => {
-      const placeholder = document.createElement('div');
-      placeholder.className = 'thumb-placeholder';
-      placeholder.textContent = kind.toUpperCase();
-      wrap.innerHTML = '';
-      wrap.appendChild(placeholder);
+      wrap.replaceChildren(el('div', { class: 'thumb-placeholder', text: kind.toUpperCase() }));
     };
     wrap.appendChild(img);
   }
@@ -1524,9 +1908,39 @@
       if ((kind === 'gif' || kind === 'webp') && currentTarget !== kind) {
         notices.push('Animated sources are flattened to the first frame in v1.');
       }
+      const txDescription = describeActiveTransforms();
+      if (txDescription) {
+        notices.push('Transforms active: ' + txDescription);
+      }
 
-      slot.innerHTML = notices.map((n) => `<span>• ${escHtml(n)}</span>`).join('');
+      slot.replaceChildren(...notices.map((n) => el('span', { text: '• ' + n })));
     }
+  }
+
+  // Compose a short human-readable summary of the active transforms, used
+  // in per-row notices so users see at a glance what will happen to each file.
+  function describeActiveTransforms() {
+    if (typeof transformsState === 'undefined') return '';
+    const s = transformsState;
+    const parts = [];
+    if (s.resize.mode === 'max') {
+      const dims = [s.resize.width, s.resize.height].filter(Boolean).join('×');
+      if (dims) parts.push('max ' + dims + 'px');
+    } else if (s.resize.mode === 'percentage') {
+      if (s.resize.percentage && s.resize.percentage !== 100) parts.push(s.resize.percentage + '%');
+    } else if (s.resize.mode === 'exact') {
+      if (s.resize.width && s.resize.height) parts.push('exact ' + s.resize.width + '×' + s.resize.height);
+    }
+    if (s.rotate !== 0) parts.push('rotate ' + s.rotate + '°');
+    if (s.flip.horizontal) parts.push('flip H');
+    if (s.flip.vertical) parts.push('flip V');
+    if (s.crop.aspect !== 'none') {
+      const label = s.crop.aspect === 'custom'
+        ? (s.crop.customW && s.crop.customH ? 'crop ' + s.crop.customW + ':' + s.crop.customH : '')
+        : 'crop ' + s.crop.aspect;
+      if (label) parts.push(label);
+    }
+    return parts.join(', ');
   }
 
   async function convertFile(id) {
@@ -1555,6 +1969,14 @@
     if (stripEl && !stripEl.checked) formData.append('stripMetadata', 'false');
     if (preserveEl && preserveEl.checked) formData.append('preserveColorProfile', 'true');
 
+    // Cross-cutting transforms (resize, rotate, flip, crop, kernel). Only
+    // sent when the user has actually engaged a control — keeps the byte-
+    // identical guarantee intact for default conversions.
+    const transformsPayload = getTransformsPayload();
+    if (transformsPayload) {
+      formData.append('transforms', JSON.stringify(transformsPayload));
+    }
+
     try {
       const resp = await fetch('/api/convert', { method: 'POST', body: formData });
       const data = await resp.json();
@@ -1569,30 +1991,45 @@
       const pct = data.originalSize > 0
         ? Math.round((savings / data.originalSize) * 100)
         : 0;
-      const savingsStr = savings > 0
-        ? `<span class="savings">↓ ${pct}% saved</span>`
-        : `<span style="color:var(--text-muted)">${pct === 0 ? 'same size' : '↑ larger'}</span>`;
+      const savingsNode = savings > 0
+        ? el('span', { class: 'savings', text: '↓ ' + pct + '% saved' })
+        : el('span',
+            { style: { color: 'var(--text-muted)' },
+              text: pct === 0 ? 'same size' : '↑ larger' });
 
-      row.querySelector('.result-info').innerHTML =
-        `<span class="arrow">→</span> ${formatSize(data.convertedSize)} <span class="sep">·</span> ${savingsStr}`;
+      row.querySelector('.result-info').replaceChildren(
+        el('span', { class: 'arrow', text: '→' }),
+        ' ',
+        formatSize(data.convertedSize),
+        ' ',
+        el('span', { class: 'sep', text: '·' }),
+        ' ',
+        savingsNode,
+      );
 
-      const wrap = row.querySelector('.download-wrap');
-      wrap.innerHTML = `<a class="download-link"
-        href="/api/download/${encodeURIComponent(data.convertedName)}"
-        download="${escHtml(data.convertedName)}">
-          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M8 2v9M4 7l4 4 4-4M3 13h10"/>
-          </svg>
-          Save
-        </a>`;
+      const downloadIcon = svgEl('svg',
+        { viewBox: '0 0 16 16', fill: 'none', stroke: 'currentColor',
+          'stroke-width': 1.8, 'stroke-linecap': 'round', 'stroke-linejoin': 'round' },
+        svgEl('path', { d: 'M8 2v9M4 7l4 4 4-4M3 13h10' }),
+      );
+      row.querySelector('.download-wrap').replaceChildren(
+        el('a',
+          { class: 'download-link',
+            href: '/api/download/' + encodeURIComponent(data.convertedName),
+            download: data.convertedName },
+          downloadIcon,
+          ' Save',
+        ),
+      );
 
       convertBtn.textContent = 'Reconvert';
       convertBtn.disabled = false;
     } catch (err) {
       entry.state = 'error';
       row.className = 'file-row error';
-      row.querySelector('.result-info').innerHTML =
-        `<span class="error-msg"> — ${escHtml(err.message)}</span>`;
+      row.querySelector('.result-info').replaceChildren(
+        el('span', { class: 'error-msg', text: ' — ' + err.message }),
+      );
       convertBtn.textContent = 'Retry';
       convertBtn.disabled = false;
     }
@@ -1600,10 +2037,78 @@
     refresh();
   }
 
-  async function convertAll() {
-    const pending = [...files.entries()].filter(([, e]) => e.state !== 'converting');
-    for (const [id] of pending) {
-      await convertFile(id);
+  // Convert only files that haven't been successfully converted yet
+  // (pending or previously errored). Used as the default action when the
+  // batch has any unconverted files.
+  async function convertNew() {
+    for (const [id, e] of files.entries()) {
+      if (e.state === 'pending' || e.state === 'error') {
+        await convertFile(id);
+      }
+    }
+  }
+
+  // Convert every file regardless of current state. Used as the default
+  // action when everything is already done (e.g. the user changed settings
+  // and wants to re-run), or available via the dropdown when there's a mix
+  // of new and done files.
+  async function reconvertAll() {
+    for (const [id, e] of files.entries()) {
+      if (e.state !== 'converting') {
+        await convertFile(id);
+      }
+    }
+  }
+
+  // Compute the right label + primary/alt actions for the split button
+  // based on the current file states. Called from refresh().
+  function refreshConvertBatchButton() {
+    let pending = 0, done = 0;
+    for (const e of files.values()) {
+      if (e.state === 'pending' || e.state === 'error') pending++;
+      else if (e.state === 'done') done++;
+    }
+    const total = pending + done;
+    const plural = (n) => n === 1 ? '' : 's';
+
+    convertMenu.hidden = true;
+    convertToggleBtn.setAttribute('aria-expanded', 'false');
+
+    if (total === 0) {
+      convertPrimaryBtn.disabled = true;
+      convertToggleBtn.style.display = 'none';
+      convertSplit.classList.add('solo');
+      convertPrimaryLbl.textContent = 'Convert';
+      currentPrimaryAction = null;
+      currentAltAction = null;
+      return;
+    }
+
+    convertPrimaryBtn.disabled = false;
+
+    if (pending === total) {
+      // Fresh batch — everything still to do.
+      convertPrimaryLbl.textContent = `Convert ${pending} file${plural(pending)}`;
+      currentPrimaryAction = convertNew;
+      currentAltAction = null;
+      convertToggleBtn.style.display = 'none';
+      convertSplit.classList.add('solo');
+    } else if (done === total) {
+      // Everything's converted — reconvert is the only useful batch action.
+      convertPrimaryLbl.textContent = `Reconvert all ${done} file${plural(done)}`;
+      currentPrimaryAction = reconvertAll;
+      currentAltAction = null;
+      convertToggleBtn.style.display = 'none';
+      convertSplit.classList.add('solo');
+    } else {
+      // Mixed — Convert New is the default; offer Reconvert All as the alt.
+      convertPrimaryLbl.textContent = `Convert ${pending} new`;
+      currentPrimaryAction = convertNew;
+      convertAltBtn.textContent = `Reconvert all (${total})`;
+      currentAltAction = reconvertAll;
+      convertToggleBtn.style.display = '';
+      convertToggleBtn.disabled = false;
+      convertSplit.classList.remove('solo');
     }
   }
 
@@ -1616,7 +2121,7 @@
   }
 
   function clearAll() {
-    fileList.innerHTML = '';
+    fileList.replaceChildren();
     files.clear();
     refresh();
   }
@@ -1627,7 +2132,7 @@
     emptyState.style.display = count === 0 ? 'block' : 'none';
     batchBar.style.display = count > 0 ? 'flex' : 'none';
     fileCount.textContent = `${count} file${count !== 1 ? 's' : ''}`;
-    convertAllBtn.disabled = count === 0;
+    refreshConvertBatchButton();
 
     // SVG density only visible when an SVG file is in the list.
     const hasSvg = [...files.values()].some((e) => e.kind === 'svg');
@@ -1643,6 +2148,66 @@
     return `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
   }
 
+  // -- DOM helpers ----------------------------------------------------------
+  // el() and svgEl() build DOM trees the safe way — every attribute value
+  // and every text child goes through setAttribute / createTextNode, never
+  // through the HTML parser. This eliminates the XSS sink that string-
+  // interpolated innerHTML assignments represent, and closes CodeQL's "DOM
+  // text reinterpreted as HTML" alert class structurally.
+  //
+  // Usage:
+  //   el('div', {class: 'thumb-wrap'})
+  //   el('span', {class: 'kind-label'}, 'JPEG')
+  //   el('input', {type: 'range', min: 0, max: 100, value: 80,
+  //                oninput: e => console.log(e.target.value)})
+  //
+  // Convention: 'class' → className, 'text' → textContent, 'dataset' →
+  // dataset assign, onXxx → addEventListener, true → bare attribute,
+  // false/null → omitted.
+  function el(tag, attrs, ...children) {
+    const node = document.createElement(tag);
+    if (attrs) applyAttrs(node, attrs);
+    appendChildren(node, children);
+    return node;
+  }
+  const SVG_NS = 'http://www.w3.org/2000/svg';
+  function svgEl(tag, attrs, ...children) {
+    const node = document.createElementNS(SVG_NS, tag);
+    if (attrs) applyAttrs(node, attrs, /*svg*/ true);
+    appendChildren(node, children);
+    return node;
+  }
+  function applyAttrs(node, attrs, isSvg) {
+    for (const [k, v] of Object.entries(attrs)) {
+      if (v == null || v === false) continue;
+      if (k === 'class') node.setAttribute('class', String(v));
+      else if (k === 'text') node.textContent = String(v);
+      else if (k === 'dataset' && typeof v === 'object') Object.assign(node.dataset, v);
+      else if (k === 'style' && typeof v === 'object') Object.assign(node.style, v);
+      else if (k.startsWith('on') && typeof v === 'function') {
+        node.addEventListener(k.slice(2).toLowerCase(), v);
+      } else if (v === true) {
+        node.setAttribute(k, '');
+      } else {
+        node.setAttribute(k, String(v));
+      }
+    }
+  }
+  function appendChildren(node, children) {
+    for (const c of children) {
+      if (c == null || c === false) continue;
+      if (Array.isArray(c)) appendChildren(node, c);
+      else if (typeof c === 'string' || typeof c === 'number') {
+        node.appendChild(document.createTextNode(String(c)));
+      } else {
+        node.appendChild(c);
+      }
+    }
+  }
+
+  // escHtml is retained for backwards-compat with any future contributor
+  // who reaches for the old string-interpolation pattern; no live caller
+  // uses it after the v1.2 DOM-API refactor.
   function escHtml(str) {
     return String(str)
       .replace(/&/g, '&amp;')
@@ -1704,6 +2269,299 @@
     }
     stripEl.addEventListener('change', syncPreserveEnabled);
     syncPreserveEnabled();
+  })();
+
+  // -- Transforms (resize, rotate, flip, crop, kernel) ----------------------
+  // Single source of truth for the section's state. Parallel to currentOpts
+  // (per-format options) and the metadata toggles. Serialized into the
+  // POST payload as JSON in the `transforms` form field.
+  const TRANSFORMS_DEFAULTS = () => ({
+    resize: { mode: 'none', width: 0, height: 0, percentage: 100, upscale: false },
+    rotate: 0,
+    flip: { horizontal: false, vertical: false },
+    crop: { aspect: 'none', customW: 0, customH: 0 },
+    kernel: 'lanczos3',
+  });
+  let transformsState = TRANSFORMS_DEFAULTS();
+
+  // Build the JSON payload to send to the server. Returns null when the
+  // state is at all defaults — that keeps the request payload minimal and
+  // preserves the WebP byte-identical guarantee for unmodified conversions.
+  function getTransformsPayload() {
+    const s = transformsState;
+    const out = {};
+    if (s.resize.mode !== 'none') {
+      out.resize = { mode: s.resize.mode, upscale: s.resize.upscale };
+      if (s.resize.mode === 'max' || s.resize.mode === 'exact') {
+        if (s.resize.width) out.resize.width = s.resize.width;
+        if (s.resize.height) out.resize.height = s.resize.height;
+      } else if (s.resize.mode === 'percentage') {
+        out.resize.percentage = s.resize.percentage;
+      }
+    }
+    if (s.rotate !== 0) out.rotate = s.rotate;
+    if (s.flip.horizontal || s.flip.vertical) {
+      out.flip = { horizontal: !!s.flip.horizontal, vertical: !!s.flip.vertical };
+    }
+    if (s.crop.aspect !== 'none') {
+      out.crop = { aspect: s.crop.aspect };
+      if (s.crop.aspect === 'custom') {
+        out.crop.customW = s.crop.customW;
+        out.crop.customH = s.crop.customH;
+      }
+    }
+    if (s.kernel !== 'lanczos3') out.kernel = s.kernel;
+    return Object.keys(out).length ? out : null;
+  }
+
+  // Count how many transform categories are non-default. Drives the badge.
+  function countActiveTransforms() {
+    const s = transformsState;
+    let n = 0;
+    if (s.resize.mode !== 'none') n++;
+    if (s.rotate !== 0) n++;
+    if (s.flip.horizontal || s.flip.vertical) n++;
+    if (s.crop.aspect !== 'none') n++;
+    return n;
+  }
+
+  // Compute the resulting dimensions for the first file in the list, applying
+  // the same ordered transforms the server does. Returns a string like
+  // "320×240" or null when no preview is meaningful.
+  function computeResizePreview() {
+    if (transformsState.resize.mode === 'none') return null;
+    const first = [...files.values()].find((e) => e.naturalW && e.naturalH);
+    if (!first) return null;
+
+    let w = first.naturalW, h = first.naturalH;
+
+    // Rotate
+    if (transformsState.rotate === 90 || transformsState.rotate === 270) {
+      [w, h] = [h, w];
+    }
+
+    // Crop
+    if (transformsState.crop.aspect !== 'none') {
+      const ratio = parseCropAspect(transformsState.crop);
+      if (ratio) {
+        const srcAspect = w / h;
+        const targetAspect = ratio[0] / ratio[1];
+        if (Math.abs(srcAspect - targetAspect) > 1e-6) {
+          if (srcAspect > targetAspect) w = Math.round(h * targetAspect);
+          else h = Math.round(w / targetAspect);
+        }
+      }
+    }
+
+    // Resize
+    const r = transformsState.resize;
+    if (r.mode === 'max') {
+      const maxW = r.width || Infinity;
+      const maxH = r.height || Infinity;
+      const ratio = Math.min(maxW / w, maxH / h);
+      if (ratio < 1 || (ratio > 1 && r.upscale)) {
+        w = Math.round(w * ratio);
+        h = Math.round(h * ratio);
+      }
+    } else if (r.mode === 'exact') {
+      if (r.width && r.height) { w = r.width; h = r.height; }
+    } else if (r.mode === 'percentage') {
+      const pct = r.percentage || 100;
+      if (pct !== 100 && !(pct > 100 && !r.upscale)) {
+        w = Math.max(1, Math.round(w * pct / 100));
+        h = Math.max(1, Math.round(h * pct / 100));
+      }
+    }
+
+    return `${w}×${h}`;
+  }
+
+  function parseCropAspect(crop) {
+    switch (crop.aspect) {
+      case '1:1':  return [1, 1];
+      case '4:3':  return [4, 3];
+      case '16:9': return [16, 9];
+      case '3:2':  return [3, 2];
+      case 'custom':
+        return (crop.customW > 0 && crop.customH > 0)
+          ? [crop.customW, crop.customH] : null;
+      default: return null;
+    }
+  }
+
+  (function initTransformsUI() {
+    const toggleBtn = document.getElementById('transforms-toggle');
+    const body = document.getElementById('transforms-body');
+    const badge = document.getElementById('transforms-badge');
+    const resetBtn = document.getElementById('transforms-reset');
+
+    const resizeBtnRow = document.getElementById('resize-mode-buttons');
+    const resizeMaxW = document.getElementById('resize-max-w');
+    const resizeMaxH = document.getElementById('resize-max-h');
+    const resizePct = document.getElementById('resize-pct');
+    const resizeExactW = document.getElementById('resize-exact-w');
+    const resizeExactH = document.getElementById('resize-exact-h');
+    const resizeUpscale = document.getElementById('resize-upscale');
+    const resizeUpscaleRow = document.getElementById('resize-upscale-row');
+    const resizePreview = document.getElementById('resize-preview');
+
+    const rotateBtnRow = document.getElementById('rotate-buttons');
+    const flipH = document.getElementById('flip-horizontal');
+    const flipV = document.getElementById('flip-vertical');
+
+    const cropAspectSel = document.getElementById('crop-aspect');
+    const cropCustomBox = document.getElementById('crop-custom-inputs');
+    const cropCustomW = document.getElementById('crop-custom-w');
+    const cropCustomH = document.getElementById('crop-custom-h');
+
+    const kernelSel = document.getElementById('resample-kernel');
+
+    // -- Collapsible body
+    toggleBtn.addEventListener('click', () => {
+      const open = !body.hidden;
+      body.hidden = open;
+      toggleBtn.setAttribute('aria-expanded', String(!open));
+    });
+
+    // -- Mode segmented buttons
+    function setActiveSegmented(row, value, dataAttr) {
+      row.querySelectorAll('.transforms-seg-btn').forEach((b) => {
+        const isActive = b.dataset[dataAttr] === String(value);
+        b.classList.toggle('active', isActive);
+        b.setAttribute('aria-checked', String(isActive));
+      });
+    }
+
+    resizeBtnRow.addEventListener('click', (e) => {
+      const btn = e.target.closest('.transforms-seg-btn');
+      if (!btn) return;
+      const mode = btn.dataset.mode;
+      transformsState.resize.mode = mode;
+      setActiveSegmented(resizeBtnRow, mode, 'mode');
+      syncResizeInputs();
+      refreshTransformsUI();
+    });
+
+    rotateBtnRow.addEventListener('click', (e) => {
+      const btn = e.target.closest('.transforms-seg-btn');
+      if (!btn) return;
+      transformsState.rotate = Number(btn.dataset.rotate);
+      setActiveSegmented(rotateBtnRow, transformsState.rotate, 'rotate');
+      refreshTransformsUI();
+    });
+
+    // -- Resize inputs
+    function syncResizeInputs() {
+      document.getElementById('resize-inputs-max').hidden = transformsState.resize.mode !== 'max';
+      document.getElementById('resize-inputs-percentage').hidden = transformsState.resize.mode !== 'percentage';
+      document.getElementById('resize-inputs-exact').hidden = transformsState.resize.mode !== 'exact';
+      resizeUpscaleRow.hidden = !(transformsState.resize.mode === 'max' || transformsState.resize.mode === 'percentage');
+      kernelSel.disabled = transformsState.resize.mode === 'none';
+    }
+    resizeMaxW.addEventListener('input', () => {
+      transformsState.resize.width = Number(resizeMaxW.value) || 0;
+      refreshTransformsUI();
+    });
+    resizeMaxH.addEventListener('input', () => {
+      transformsState.resize.height = Number(resizeMaxH.value) || 0;
+      refreshTransformsUI();
+    });
+    resizePct.addEventListener('input', () => {
+      transformsState.resize.percentage = Number(resizePct.value) || 100;
+      refreshTransformsUI();
+    });
+    resizeExactW.addEventListener('input', () => {
+      transformsState.resize.width = Number(resizeExactW.value) || 0;
+      refreshTransformsUI();
+    });
+    resizeExactH.addEventListener('input', () => {
+      transformsState.resize.height = Number(resizeExactH.value) || 0;
+      refreshTransformsUI();
+    });
+    resizeUpscale.addEventListener('change', () => {
+      transformsState.resize.upscale = resizeUpscale.checked;
+      refreshTransformsUI();
+    });
+
+    // -- Flip
+    flipH.addEventListener('change', () => {
+      transformsState.flip.horizontal = flipH.checked;
+      refreshTransformsUI();
+    });
+    flipV.addEventListener('change', () => {
+      transformsState.flip.vertical = flipV.checked;
+      refreshTransformsUI();
+    });
+
+    // -- Crop
+    cropAspectSel.addEventListener('change', () => {
+      transformsState.crop.aspect = cropAspectSel.value;
+      cropCustomBox.hidden = transformsState.crop.aspect !== 'custom';
+      refreshTransformsUI();
+    });
+    cropCustomW.addEventListener('input', () => {
+      transformsState.crop.customW = Number(cropCustomW.value) || 0;
+      refreshTransformsUI();
+    });
+    cropCustomH.addEventListener('input', () => {
+      transformsState.crop.customH = Number(cropCustomH.value) || 0;
+      refreshTransformsUI();
+    });
+
+    // -- Kernel
+    kernelSel.addEventListener('change', () => {
+      transformsState.kernel = kernelSel.value;
+      refreshTransformsUI();
+    });
+
+    // -- Reset
+    resetBtn.addEventListener('click', () => {
+      transformsState = TRANSFORMS_DEFAULTS();
+      // Reset all inputs to defaults
+      setActiveSegmented(resizeBtnRow, 'none', 'mode');
+      setActiveSegmented(rotateBtnRow, 0, 'rotate');
+      resizeMaxW.value = '';
+      resizeMaxH.value = '';
+      resizePct.value = '100';
+      resizeExactW.value = '';
+      resizeExactH.value = '';
+      resizeUpscale.checked = false;
+      flipH.checked = false;
+      flipV.checked = false;
+      cropAspectSel.value = 'none';
+      cropCustomBox.hidden = true;
+      cropCustomW.value = '';
+      cropCustomH.value = '';
+      kernelSel.value = 'lanczos3';
+      syncResizeInputs();
+      refreshTransformsUI();
+    });
+
+    // Refresh badge + preview + per-row notice from current state.
+    window.refreshTransformsUI = function () {
+      const n = countActiveTransforms();
+      if (n > 0) {
+        badge.textContent = n + ' active';
+        badge.hidden = false;
+        resetBtn.hidden = false;
+      } else {
+        badge.hidden = true;
+        resetBtn.hidden = true;
+      }
+      const preview = computeResizePreview();
+      if (preview) {
+        resizePreview.textContent = '→ ' + preview + ' (preview from first file)';
+        resizePreview.hidden = false;
+      } else {
+        resizePreview.hidden = true;
+      }
+      // Per-row notices may need to mention the active transforms
+      if (typeof refreshFileNotices === 'function') refreshFileNotices();
+    };
+
+    // Initial sync (no-op state, but makes sure UI matches)
+    syncResizeInputs();
+    refreshTransformsUI();
   })();
 
   // Initial render

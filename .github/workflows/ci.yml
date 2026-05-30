@@ -1,0 +1,71 @@
+# Lightweight CI for LocalPix — runs on PRs to main and direct pushes to main.
+#
+# Catches the cheap-to-detect class of breakage:
+#   - Missing or out-of-sync dependencies (npm ci verifies the lockfile)
+#   - JS syntax errors in any of our entrypoints (node --check)
+#   - Module-load-time errors, e.g. a polyfill that fails to initialise
+#
+# Intentionally NOT here (in scope for the release workflow instead):
+#   - Building packaged macOS / Windows artifacts — that's release.yml's job
+#   - Heavy integration tests against fixture images — would need binary
+#     test assets committed; defer until we have a tests/ folder worth the
+#     bytes.
+#
+# Runs on Linux (cheapest runner minutes) since this is just a code-shape
+# check. Sharp's @img/sharp-linux-x64 native binding is fetched automatically
+# by npm ci on Ubuntu, and magick-wasm is pure WebAssembly.
+
+name: CI
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+env:
+  # Same opt-in as release.yml — silences the Node 20 deprecation noise on
+  # the JS actions runtime.
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: 'true'
+
+# Cancel earlier runs on the same PR/branch when newer commits arrive.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  smoke:
+    name: Smoke check
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      - name: Install dependencies
+        # npm ci is strict — it fails if package-lock.json is out of sync
+        # with package.json, which catches a real class of mistakes.
+        run: npm ci
+
+      - name: Syntax check JS entrypoints
+        run: |
+          node --check server.js
+          node --check electron/main.js
+          node --check electron/preload.js
+          node --check lib/magick.js
+
+      - name: Smoke import modules
+        # Loading server.js and lib/magick.js exercises every require() and
+        # the magick-wasm lazy-init path. Catches polyfill regressions and
+        # missing-dep issues that a syntax check would miss.
+        run: |
+          node -e "require('./server.js'); console.log('server.js OK')"
+          node -e "require('./lib/magick.js'); console.log('lib/magick.js OK')"

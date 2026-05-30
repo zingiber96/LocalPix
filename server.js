@@ -72,6 +72,11 @@ const INPUT_MIMES = new Set([
   'image/vnd.adobe.photoshop', 'application/x-photoshop',
   'application/photoshop', 'application/psd', 'image/x-photoshop',
   'image/jxl',
+  // Note: RAW camera formats (NEF/CR2/DNG/ARW/etc.) were investigated for
+  // v1.2 — magick-wasm "accepts" them but only extracts the tiny embedded
+  // preview (typically 160×120), not the full demosaiced sensor data. That
+  // would surprise users expecting their full image, so RAW input stays
+  // deferred until we wire a real RAW decoder (libraw-wasm or similar).
 ]);
 const INPUT_EXTS = new Set([
   '.jpg', '.jpeg', '.png', '.webp', '.avif', '.gif',
@@ -175,6 +180,148 @@ function packIco(pngBuffers, sizes) {
     offset += buf.length;
   }
   return Buffer.concat([header, dirEntries, ...pngBuffers]);
+}
+
+// Apply the v1.2 transforms (rotate, flip, crop, resize) to a sharp pipeline.
+// Called once at the endpoint level, between buildSourcePipeline() and the
+// encoder. Order is fixed (orient → crop → resize) and matches the user's
+// mental model of what should happen first.
+//
+// Defaults match "no transform": when the incoming opts are null/undefined
+// or every field is at its default, this function is a no-op on the pipeline.
+// That preserves the WebP byte-identical guarantee for callers that don't
+// send a `transforms` form field.
+//
+// Returns a (possibly modified) sharp pipeline.
+async function applyTransforms(pipeline, t) {
+  if (!t || typeof t !== 'object') return pipeline;
+
+  // Source dims are lazily fetched — only needed for crop and percentage
+  // resize. clone() so the metadata read doesn't consume the pipeline.
+  let _meta;
+  async function meta() {
+    if (!_meta) _meta = await pipeline.clone().metadata();
+    return _meta;
+  }
+
+  let p = pipeline;
+
+  // 1) Rotate. Only fixed 90° increments are accepted; anything else is a
+  //    no-op so a malformed input doesn't accidentally rotate by 7°.
+  if (t.rotate === 90 || t.rotate === 180 || t.rotate === 270) {
+    p = p.rotate(t.rotate);
+  }
+
+  // 2) Flip. sharp.flip() is vertical (top↔bottom mirror); .flop() is
+  //    horizontal (left↔right). Apply each independently.
+  if (t.flip && t.flip.vertical) p = p.flip();
+  if (t.flip && t.flip.horizontal) p = p.flop();
+
+  // 3) Crop to aspect ratio (center crop).
+  const cropAspect = parseCropAspect(t.crop);
+  if (cropAspect) {
+    const m = await meta();
+    if (m.width && m.height) {
+      const cropBox = computeCenterCrop(m.width, m.height, cropAspect[0], cropAspect[1]);
+      if (cropBox) p = p.extract(cropBox);
+    }
+  }
+
+  // 4) Resize.
+  if (t.resize && t.resize.mode && t.resize.mode !== 'none') {
+    const kernel = ['nearest', 'cubic', 'mitchell', 'lanczos2', 'lanczos3'].includes(t.kernel)
+      ? t.kernel
+      : 'lanczos3';
+    const upscale = !!t.resize.upscale;
+
+    if (t.resize.mode === 'max') {
+      // Bound the long edge. Either width or height (or both) may be set;
+      // sharp's fit:'inside' preserves aspect within the box.
+      const w = parsePositiveInt(t.resize.width);
+      const h = parsePositiveInt(t.resize.height);
+      if (w || h) {
+        p = p.resize({
+          width: w || null,
+          height: h || null,
+          fit: 'inside',
+          withoutEnlargement: !upscale,
+          kernel,
+        });
+      }
+    } else if (t.resize.mode === 'exact') {
+      // Produce exactly width × height. fit:'cover' center-crops if the
+      // source aspect doesn't match. We do NOT honour upscale=false for
+      // 'exact' — "exact 800x600" is a contradiction with "no enlargement"
+      // when source is smaller, so we always allow enlargement here.
+      const w = parsePositiveInt(t.resize.width);
+      const h = parsePositiveInt(t.resize.height);
+      if (w && h) {
+        p = p.resize({ width: w, height: h, fit: 'cover', position: 'centre', kernel });
+      }
+    } else if (t.resize.mode === 'percentage') {
+      const pct = parsePositiveInt(t.resize.percentage);
+      // pct === 100 is a no-op; pct > 100 with upscale=false is also a
+      // no-op (user explicitly disabled enlargement).
+      if (pct && pct !== 100 && !(pct > 100 && !upscale)) {
+        const m = await meta();
+        if (m.width && m.height) {
+          const w = Math.max(1, Math.round((m.width * pct) / 100));
+          const h = Math.max(1, Math.round((m.height * pct) / 100));
+          p = p.resize({ width: w, height: h, fit: 'fill', kernel });
+        }
+      }
+    }
+  }
+
+  return p;
+}
+
+function parsePositiveInt(v) {
+  const n = Number.parseInt(v, 10);
+  return Number.isFinite(n) && n > 0 ? n : 0;
+}
+
+function parseCropAspect(crop) {
+  if (!crop || !crop.aspect || crop.aspect === 'none') return null;
+  switch (crop.aspect) {
+    case '1:1':  return [1, 1];
+    case '4:3':  return [4, 3];
+    case '16:9': return [16, 9];
+    case '3:2':  return [3, 2];
+    case 'custom': {
+      const w = Number(crop.customW);
+      const h = Number(crop.customH);
+      return Number.isFinite(w) && Number.isFinite(h) && w > 0 && h > 0
+        ? [w, h] : null;
+    }
+    default: return null;
+  }
+}
+
+// Compute the largest center-cropped rectangle of (aspectW : aspectH) that
+// fits inside (srcW × srcH). Returns null when the source already matches
+// the target aspect (no crop needed).
+function computeCenterCrop(srcW, srcH, aspectW, aspectH) {
+  const srcAspect = srcW / srcH;
+  const targetAspect = aspectW / aspectH;
+  if (Math.abs(srcAspect - targetAspect) < 1e-6) return null;
+
+  let cropW, cropH;
+  if (srcAspect > targetAspect) {
+    // Source is wider — crop left + right.
+    cropH = srcH;
+    cropW = Math.round(srcH * targetAspect);
+  } else {
+    // Source is taller — crop top + bottom.
+    cropW = srcW;
+    cropH = Math.round(srcW / targetAspect);
+  }
+  return {
+    left: Math.max(0, Math.round((srcW - cropW) / 2)),
+    top: Math.max(0, Math.round((srcH - cropH) / 2)),
+    width: cropW,
+    height: cropH,
+  };
 }
 
 // Apply the two global metadata toggles to a sharp pipeline. Called by each
@@ -475,6 +622,19 @@ function createApp() {
     opts._stripMetadata = req.body.stripMetadata !== 'false';
     opts._preserveColorProfile = req.body.preserveColorProfile === 'true';
 
+    // Cross-cutting transforms (resize, rotate, flip, crop, kernel). Applied
+    // between source decode and the format encoder. Absent or unparseable
+    // payload → null → no-op in applyTransforms(), preserving byte-identical
+    // defaults for callers that don't engage v1.2's transform controls.
+    let transforms = null;
+    if (req.body.transforms) {
+      try {
+        transforms = JSON.parse(req.body.transforms);
+      } catch (e) {
+        return res.status(400).json({ error: 'Invalid transforms JSON' });
+      }
+    }
+
     const density = clamp(req.body.inputDensity, 72, 1440, 192);
     const sourceKind = detectSourceKind(req.file);
 
@@ -483,7 +643,8 @@ function createApp() {
     const outputPath = resolveOutputPath(outputFilename);
 
     try {
-      const pipeline = await buildSourcePipeline(req.file, sourceKind, { density });
+      let pipeline = await buildSourcePipeline(req.file, sourceKind, { density });
+      pipeline = await applyTransforms(pipeline, transforms);
       const outputBuffer = await encoder.encode(pipeline, opts, { sourceKind });
       fs.writeFileSync(outputPath, outputBuffer);
 
