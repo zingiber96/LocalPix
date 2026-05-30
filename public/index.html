@@ -1809,7 +1809,10 @@
     for (const { file, kind } of accepted) {
       const id = nextId++;
       const rowEl = createRow(id, file, kind);
-      files.set(id, { file, kind, rowEl, state: 'pending', naturalW: 0, naturalH: 0 });
+      // override: null means "follow the global default settings". When a
+      // file is customized (Phase 2 UI), this becomes a snapshot:
+      //   { target, opts, transforms }  (transforms is a transformsState shape)
+      files.set(id, { file, kind, rowEl, state: 'pending', naturalW: 0, naturalH: 0, override: null });
       fileList.appendChild(rowEl);
       generateThumb(id, file, kind);
     }
@@ -1943,6 +1946,59 @@
     return parts.join(', ');
   }
 
+  // Resolve the effective conversion settings for a file: its own override
+  // snapshot if it's been customized, otherwise the current global defaults.
+  // This is the single seam through which per-file overrides flow — every
+  // consumer (convertFile, the row's format badge, etc.) reads from here.
+  function getEffectiveSettings(entry) {
+    if (entry && entry.override) {
+      return {
+        targetFormat: entry.override.target,
+        opts: entry.override.opts,
+        transformsPayload: getTransformsPayload(entry.override.transforms),
+        customized: true,
+      };
+    }
+    return {
+      targetFormat: currentTarget,
+      opts: currentOpts,
+      transformsPayload: getTransformsPayload(),
+      customized: false,
+    };
+  }
+
+  // Snapshot the current global settings into a file's override, detaching it
+  // from the defaults. Deep-cloned so later global edits don't bleed in.
+  function snapshotGlobalSettings() {
+    return {
+      target: currentTarget,
+      opts: JSON.parse(JSON.stringify(currentOpts)),
+      transforms: JSON.parse(JSON.stringify(transformsState)),
+    };
+  }
+
+  // -- Per-file override actions (UI wired in Phase 2) ----------------------
+  function customizeFile(id) {
+    const entry = files.get(id);
+    if (!entry) return;
+    entry.override = snapshotGlobalSettings();
+    refresh();
+  }
+  function resetFileToDefaults(id) {
+    const entry = files.get(id);
+    if (!entry) return;
+    entry.override = null;
+    refresh();
+  }
+  // "Apply to all" — push the current global settings onto every file,
+  // overwriting any existing per-file customization.
+  function applyGlobalToAll() {
+    for (const entry of files.values()) {
+      entry.override = snapshotGlobalSettings();
+    }
+    refresh();
+  }
+
   async function convertFile(id) {
     const entry = files.get(id);
     if (!entry || entry.state === 'converting') return;
@@ -1954,27 +2010,27 @@
     const convertBtn = row.querySelector('.convert-btn');
     convertBtn.disabled = true;
 
+    const settings = getEffectiveSettings(entry);
+
     const formData = new FormData();
     formData.append('image', entry.file);
-    formData.append('targetFormat', currentTarget);
-    formData.append('options', JSON.stringify(currentOpts));
+    formData.append('targetFormat', settings.targetFormat);
+    formData.append('options', JSON.stringify(settings.opts));
     if (entry.kind === 'svg') {
       formData.append('inputDensity', svgDensity.value);
     }
     // Metadata toggles. Only send when they deviate from defaults so the
     // server keeps its byte-identical no-op default behavior when both are
-    // at the stock values.
+    // at the stock values. (Privacy toggles stay global in v1.3.)
     const stripEl = document.getElementById('strip-metadata');
     const preserveEl = document.getElementById('preserve-color-profile');
     if (stripEl && !stripEl.checked) formData.append('stripMetadata', 'false');
     if (preserveEl && preserveEl.checked) formData.append('preserveColorProfile', 'true');
 
-    // Cross-cutting transforms (resize, rotate, flip, crop, kernel). Only
-    // sent when the user has actually engaged a control — keeps the byte-
-    // identical guarantee intact for default conversions.
-    const transformsPayload = getTransformsPayload();
-    if (transformsPayload) {
-      formData.append('transforms', JSON.stringify(transformsPayload));
+    // Cross-cutting transforms (resize, rotate, flip, crop, kernel) from the
+    // resolved settings — per-file override or global default.
+    if (settings.transformsPayload) {
+      formData.append('transforms', JSON.stringify(settings.transformsPayload));
     }
 
     try {
@@ -2287,8 +2343,10 @@
   // Build the JSON payload to send to the server. Returns null when the
   // state is at all defaults — that keeps the request payload minimal and
   // preserves the WebP byte-identical guarantee for unmodified conversions.
-  function getTransformsPayload() {
-    const s = transformsState;
+  // Accepts an optional state object (a transformsState-shaped value) so
+  // per-file overrides can reuse this; defaults to the global state.
+  function getTransformsPayload(state) {
+    const s = state || transformsState;
     const out = {};
     if (s.resize.mode !== 'none') {
       out.resize = { mode: s.resize.mode, upscale: s.resize.upscale };
