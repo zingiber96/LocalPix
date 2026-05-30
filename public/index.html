@@ -555,6 +555,160 @@
       border-left: 2px solid var(--border-strong);
     }
 
+    /* --- Transforms section ------------------------------------------- */
+
+    .transforms-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+    }
+
+    .transforms-toggle {
+      background: transparent;
+      border: 0;
+      padding: 4px 0;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      color: var(--text-muted);
+      font-family: inherit;
+    }
+    .transforms-toggle:hover { color: var(--text); }
+
+    .transforms-chevron {
+      width: 12px;
+      height: 12px;
+      transition: transform 0.15s ease;
+    }
+    .transforms-toggle[aria-expanded="true"] .transforms-chevron {
+      transform: rotate(-180deg);
+    }
+
+    .transforms-label {
+      margin: 0;
+      padding: 0;
+    }
+
+    .transforms-badge {
+      display: inline-flex;
+      align-items: center;
+      padding: 2px 8px;
+      font-size: 10.5px;
+      font-weight: 600;
+      letter-spacing: 0;
+      text-transform: none;
+      color: var(--accent);
+      background: color-mix(in oklab, var(--accent) 14%, transparent);
+      border-radius: 999px;
+    }
+    .transforms-badge[hidden] { display: none; }
+
+    .transforms-body {
+      margin-top: 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+    .transforms-body[hidden] { display: none; }
+
+    .transforms-row {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .transforms-row > .field-label {
+      margin: 0;
+    }
+
+    .transforms-segmented {
+      display: inline-flex;
+      gap: 2px;
+      background: var(--surface-2);
+      padding: 3px;
+      border-radius: var(--radius-sm);
+      border: 1px solid var(--border);
+      align-self: flex-start;
+    }
+    .transforms-seg-btn {
+      background: transparent;
+      border: 1px solid transparent;
+      padding: 5px 10px;
+      border-radius: 4px;
+      font-size: 11.5px;
+      font-weight: 500;
+      color: var(--text-muted);
+      cursor: pointer;
+      font-family: inherit;
+      white-space: nowrap;
+      transition: background-color 0.12s, color 0.12s, border-color 0.12s;
+    }
+    .transforms-seg-btn:hover {
+      color: var(--text);
+      background: var(--surface);
+    }
+    .transforms-seg-btn.active {
+      background: var(--surface);
+      color: var(--accent);
+      border-color: var(--border-strong);
+    }
+
+    .resize-inputs {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      flex-wrap: wrap;
+    }
+    .resize-inputs[hidden] { display: none; }
+    .resize-inputs input[type="number"] {
+      width: 88px;
+    }
+    .resize-sep {
+      color: var(--text-muted);
+      font-size: 12.5px;
+    }
+    .resize-unit {
+      color: var(--text-muted);
+      font-size: 11.5px;
+    }
+
+    .resize-upscale-row[hidden] { display: none; }
+
+    .resize-preview {
+      font-size: 11.5px;
+      color: var(--text-muted);
+      font-style: italic;
+    }
+    .resize-preview[hidden] { display: none; }
+
+    .flip-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px 18px;
+    }
+
+    .transforms-aspect-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+    .transforms-aspect-row select { width: auto; min-width: 180px; }
+
+    .crop-custom-inputs {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .crop-custom-inputs[hidden] { display: none; }
+    .crop-custom-inputs input[type="number"] {
+      width: 64px;
+    }
+
+    #resample-kernel { width: auto; min-width: 220px; }
+    #resample-kernel:disabled { opacity: 0.6; }
+
     /* --- Output folder row --------------------------------------------- */
 
     .output-row {
@@ -1086,6 +1240,113 @@
         <input type="checkbox" id="preserve-color-profile" />
         <label for="preserve-color-profile">Preserve color profile</label>
       </div>
+    </div>
+  </section>
+
+  <!-- Transforms ------------------------------------------------------- -->
+  <!-- Collapsible section for resize / rotate / flip / crop / resample.
+       Collapsed by default; a badge in the header signals when any
+       transform is non-default. Per-row notices appear on file rows when
+       transforms are active. -->
+  <section class="section transforms-section">
+    <div class="transforms-header">
+      <button class="transforms-toggle" id="transforms-toggle" type="button" aria-expanded="false" aria-controls="transforms-body">
+        <svg class="transforms-chevron" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="3 4.5 6 7.5 9 4.5"/>
+        </svg>
+        <span class="section-label transforms-label">Transforms</span>
+        <span class="transforms-badge" id="transforms-badge" hidden>0 active</span>
+      </button>
+      <button class="btn btn-ghost btn-sm" id="transforms-reset" type="button" hidden>Reset</button>
+    </div>
+
+    <div class="transforms-body" id="transforms-body" hidden>
+
+      <!-- Resize -->
+      <div class="transforms-row">
+        <div class="field-label">Resize</div>
+        <div class="transforms-segmented" id="resize-mode-buttons" role="radiogroup" aria-label="Resize mode">
+          <button class="transforms-seg-btn active" data-mode="none" type="button" role="radio" aria-checked="true">None</button>
+          <button class="transforms-seg-btn" data-mode="max" type="button" role="radio">Max dim</button>
+          <button class="transforms-seg-btn" data-mode="percentage" type="button" role="radio">Percentage</button>
+          <button class="transforms-seg-btn" data-mode="exact" type="button" role="radio">Exact</button>
+        </div>
+        <div class="resize-inputs" id="resize-inputs-max" hidden>
+          <input type="number" id="resize-max-w" min="1" placeholder="W" />
+          <span class="resize-sep">×</span>
+          <input type="number" id="resize-max-h" min="1" placeholder="H" />
+          <span class="resize-unit">px (bound the long edge)</span>
+        </div>
+        <div class="resize-inputs" id="resize-inputs-percentage" hidden>
+          <input type="number" id="resize-pct" min="1" max="1000" value="100" />
+          <span class="resize-unit">%</span>
+        </div>
+        <div class="resize-inputs" id="resize-inputs-exact" hidden>
+          <input type="number" id="resize-exact-w" min="1" placeholder="W" />
+          <span class="resize-sep">×</span>
+          <input type="number" id="resize-exact-h" min="1" placeholder="H" />
+          <span class="resize-unit">px (will crop to match)</span>
+        </div>
+        <div class="checkbox-row no-pad resize-upscale-row" id="resize-upscale-row" hidden>
+          <input type="checkbox" id="resize-upscale" />
+          <label for="resize-upscale">Allow upscale (default off)</label>
+        </div>
+        <div class="resize-preview" id="resize-preview" hidden></div>
+      </div>
+
+      <!-- Rotate / flip -->
+      <div class="transforms-row">
+        <div class="field-label">Rotate &amp; flip</div>
+        <div class="transforms-segmented" id="rotate-buttons" role="radiogroup" aria-label="Rotation">
+          <button class="transforms-seg-btn active" data-rotate="0" type="button" role="radio" aria-checked="true">0°</button>
+          <button class="transforms-seg-btn" data-rotate="90" type="button" role="radio">90°</button>
+          <button class="transforms-seg-btn" data-rotate="180" type="button" role="radio">180°</button>
+          <button class="transforms-seg-btn" data-rotate="270" type="button" role="radio">270°</button>
+        </div>
+        <div class="flip-row">
+          <div class="checkbox-row no-pad">
+            <input type="checkbox" id="flip-horizontal" />
+            <label for="flip-horizontal">Flip horizontal</label>
+          </div>
+          <div class="checkbox-row no-pad">
+            <input type="checkbox" id="flip-vertical" />
+            <label for="flip-vertical">Flip vertical</label>
+          </div>
+        </div>
+      </div>
+
+      <!-- Crop -->
+      <div class="transforms-row">
+        <div class="field-label">Crop to aspect</div>
+        <div class="transforms-aspect-row">
+          <select id="crop-aspect">
+            <option value="none" selected>None</option>
+            <option value="1:1">1:1 (square)</option>
+            <option value="4:3">4:3</option>
+            <option value="3:2">3:2</option>
+            <option value="16:9">16:9</option>
+            <option value="custom">Custom…</option>
+          </select>
+          <div class="crop-custom-inputs" id="crop-custom-inputs" hidden>
+            <input type="number" id="crop-custom-w" min="1" placeholder="W" />
+            <span class="resize-sep">:</span>
+            <input type="number" id="crop-custom-h" min="1" placeholder="H" />
+          </div>
+        </div>
+      </div>
+
+      <!-- Resample kernel -->
+      <div class="transforms-row">
+        <div class="field-label">Resample kernel</div>
+        <select id="resample-kernel" disabled>
+          <option value="lanczos3" selected>Lanczos 3 (default)</option>
+          <option value="lanczos2">Lanczos 2</option>
+          <option value="mitchell">Mitchell</option>
+          <option value="cubic">Cubic</option>
+          <option value="nearest">Nearest (sharp pixels)</option>
+        </select>
+      </div>
+
     </div>
   </section>
 
@@ -1647,9 +1908,39 @@
       if ((kind === 'gif' || kind === 'webp') && currentTarget !== kind) {
         notices.push('Animated sources are flattened to the first frame in v1.');
       }
+      const txDescription = describeActiveTransforms();
+      if (txDescription) {
+        notices.push('Transforms active: ' + txDescription);
+      }
 
       slot.replaceChildren(...notices.map((n) => el('span', { text: '• ' + n })));
     }
+  }
+
+  // Compose a short human-readable summary of the active transforms, used
+  // in per-row notices so users see at a glance what will happen to each file.
+  function describeActiveTransforms() {
+    if (typeof transformsState === 'undefined') return '';
+    const s = transformsState;
+    const parts = [];
+    if (s.resize.mode === 'max') {
+      const dims = [s.resize.width, s.resize.height].filter(Boolean).join('×');
+      if (dims) parts.push('max ' + dims + 'px');
+    } else if (s.resize.mode === 'percentage') {
+      if (s.resize.percentage && s.resize.percentage !== 100) parts.push(s.resize.percentage + '%');
+    } else if (s.resize.mode === 'exact') {
+      if (s.resize.width && s.resize.height) parts.push('exact ' + s.resize.width + '×' + s.resize.height);
+    }
+    if (s.rotate !== 0) parts.push('rotate ' + s.rotate + '°');
+    if (s.flip.horizontal) parts.push('flip H');
+    if (s.flip.vertical) parts.push('flip V');
+    if (s.crop.aspect !== 'none') {
+      const label = s.crop.aspect === 'custom'
+        ? (s.crop.customW && s.crop.customH ? 'crop ' + s.crop.customW + ':' + s.crop.customH : '')
+        : 'crop ' + s.crop.aspect;
+      if (label) parts.push(label);
+    }
+    return parts.join(', ');
   }
 
   async function convertFile(id) {
@@ -1677,6 +1968,14 @@
     const preserveEl = document.getElementById('preserve-color-profile');
     if (stripEl && !stripEl.checked) formData.append('stripMetadata', 'false');
     if (preserveEl && preserveEl.checked) formData.append('preserveColorProfile', 'true');
+
+    // Cross-cutting transforms (resize, rotate, flip, crop, kernel). Only
+    // sent when the user has actually engaged a control — keeps the byte-
+    // identical guarantee intact for default conversions.
+    const transformsPayload = getTransformsPayload();
+    if (transformsPayload) {
+      formData.append('transforms', JSON.stringify(transformsPayload));
+    }
 
     try {
       const resp = await fetch('/api/convert', { method: 'POST', body: formData });
@@ -1970,6 +2269,299 @@
     }
     stripEl.addEventListener('change', syncPreserveEnabled);
     syncPreserveEnabled();
+  })();
+
+  // -- Transforms (resize, rotate, flip, crop, kernel) ----------------------
+  // Single source of truth for the section's state. Parallel to currentOpts
+  // (per-format options) and the metadata toggles. Serialized into the
+  // POST payload as JSON in the `transforms` form field.
+  const TRANSFORMS_DEFAULTS = () => ({
+    resize: { mode: 'none', width: 0, height: 0, percentage: 100, upscale: false },
+    rotate: 0,
+    flip: { horizontal: false, vertical: false },
+    crop: { aspect: 'none', customW: 0, customH: 0 },
+    kernel: 'lanczos3',
+  });
+  let transformsState = TRANSFORMS_DEFAULTS();
+
+  // Build the JSON payload to send to the server. Returns null when the
+  // state is at all defaults — that keeps the request payload minimal and
+  // preserves the WebP byte-identical guarantee for unmodified conversions.
+  function getTransformsPayload() {
+    const s = transformsState;
+    const out = {};
+    if (s.resize.mode !== 'none') {
+      out.resize = { mode: s.resize.mode, upscale: s.resize.upscale };
+      if (s.resize.mode === 'max' || s.resize.mode === 'exact') {
+        if (s.resize.width) out.resize.width = s.resize.width;
+        if (s.resize.height) out.resize.height = s.resize.height;
+      } else if (s.resize.mode === 'percentage') {
+        out.resize.percentage = s.resize.percentage;
+      }
+    }
+    if (s.rotate !== 0) out.rotate = s.rotate;
+    if (s.flip.horizontal || s.flip.vertical) {
+      out.flip = { horizontal: !!s.flip.horizontal, vertical: !!s.flip.vertical };
+    }
+    if (s.crop.aspect !== 'none') {
+      out.crop = { aspect: s.crop.aspect };
+      if (s.crop.aspect === 'custom') {
+        out.crop.customW = s.crop.customW;
+        out.crop.customH = s.crop.customH;
+      }
+    }
+    if (s.kernel !== 'lanczos3') out.kernel = s.kernel;
+    return Object.keys(out).length ? out : null;
+  }
+
+  // Count how many transform categories are non-default. Drives the badge.
+  function countActiveTransforms() {
+    const s = transformsState;
+    let n = 0;
+    if (s.resize.mode !== 'none') n++;
+    if (s.rotate !== 0) n++;
+    if (s.flip.horizontal || s.flip.vertical) n++;
+    if (s.crop.aspect !== 'none') n++;
+    return n;
+  }
+
+  // Compute the resulting dimensions for the first file in the list, applying
+  // the same ordered transforms the server does. Returns a string like
+  // "320×240" or null when no preview is meaningful.
+  function computeResizePreview() {
+    if (transformsState.resize.mode === 'none') return null;
+    const first = [...files.values()].find((e) => e.naturalW && e.naturalH);
+    if (!first) return null;
+
+    let w = first.naturalW, h = first.naturalH;
+
+    // Rotate
+    if (transformsState.rotate === 90 || transformsState.rotate === 270) {
+      [w, h] = [h, w];
+    }
+
+    // Crop
+    if (transformsState.crop.aspect !== 'none') {
+      const ratio = parseCropAspect(transformsState.crop);
+      if (ratio) {
+        const srcAspect = w / h;
+        const targetAspect = ratio[0] / ratio[1];
+        if (Math.abs(srcAspect - targetAspect) > 1e-6) {
+          if (srcAspect > targetAspect) w = Math.round(h * targetAspect);
+          else h = Math.round(w / targetAspect);
+        }
+      }
+    }
+
+    // Resize
+    const r = transformsState.resize;
+    if (r.mode === 'max') {
+      const maxW = r.width || Infinity;
+      const maxH = r.height || Infinity;
+      const ratio = Math.min(maxW / w, maxH / h);
+      if (ratio < 1 || (ratio > 1 && r.upscale)) {
+        w = Math.round(w * ratio);
+        h = Math.round(h * ratio);
+      }
+    } else if (r.mode === 'exact') {
+      if (r.width && r.height) { w = r.width; h = r.height; }
+    } else if (r.mode === 'percentage') {
+      const pct = r.percentage || 100;
+      if (pct !== 100 && !(pct > 100 && !r.upscale)) {
+        w = Math.max(1, Math.round(w * pct / 100));
+        h = Math.max(1, Math.round(h * pct / 100));
+      }
+    }
+
+    return `${w}×${h}`;
+  }
+
+  function parseCropAspect(crop) {
+    switch (crop.aspect) {
+      case '1:1':  return [1, 1];
+      case '4:3':  return [4, 3];
+      case '16:9': return [16, 9];
+      case '3:2':  return [3, 2];
+      case 'custom':
+        return (crop.customW > 0 && crop.customH > 0)
+          ? [crop.customW, crop.customH] : null;
+      default: return null;
+    }
+  }
+
+  (function initTransformsUI() {
+    const toggleBtn = document.getElementById('transforms-toggle');
+    const body = document.getElementById('transforms-body');
+    const badge = document.getElementById('transforms-badge');
+    const resetBtn = document.getElementById('transforms-reset');
+
+    const resizeBtnRow = document.getElementById('resize-mode-buttons');
+    const resizeMaxW = document.getElementById('resize-max-w');
+    const resizeMaxH = document.getElementById('resize-max-h');
+    const resizePct = document.getElementById('resize-pct');
+    const resizeExactW = document.getElementById('resize-exact-w');
+    const resizeExactH = document.getElementById('resize-exact-h');
+    const resizeUpscale = document.getElementById('resize-upscale');
+    const resizeUpscaleRow = document.getElementById('resize-upscale-row');
+    const resizePreview = document.getElementById('resize-preview');
+
+    const rotateBtnRow = document.getElementById('rotate-buttons');
+    const flipH = document.getElementById('flip-horizontal');
+    const flipV = document.getElementById('flip-vertical');
+
+    const cropAspectSel = document.getElementById('crop-aspect');
+    const cropCustomBox = document.getElementById('crop-custom-inputs');
+    const cropCustomW = document.getElementById('crop-custom-w');
+    const cropCustomH = document.getElementById('crop-custom-h');
+
+    const kernelSel = document.getElementById('resample-kernel');
+
+    // -- Collapsible body
+    toggleBtn.addEventListener('click', () => {
+      const open = !body.hidden;
+      body.hidden = open;
+      toggleBtn.setAttribute('aria-expanded', String(!open));
+    });
+
+    // -- Mode segmented buttons
+    function setActiveSegmented(row, value, dataAttr) {
+      row.querySelectorAll('.transforms-seg-btn').forEach((b) => {
+        const isActive = b.dataset[dataAttr] === String(value);
+        b.classList.toggle('active', isActive);
+        b.setAttribute('aria-checked', String(isActive));
+      });
+    }
+
+    resizeBtnRow.addEventListener('click', (e) => {
+      const btn = e.target.closest('.transforms-seg-btn');
+      if (!btn) return;
+      const mode = btn.dataset.mode;
+      transformsState.resize.mode = mode;
+      setActiveSegmented(resizeBtnRow, mode, 'mode');
+      syncResizeInputs();
+      refreshTransformsUI();
+    });
+
+    rotateBtnRow.addEventListener('click', (e) => {
+      const btn = e.target.closest('.transforms-seg-btn');
+      if (!btn) return;
+      transformsState.rotate = Number(btn.dataset.rotate);
+      setActiveSegmented(rotateBtnRow, transformsState.rotate, 'rotate');
+      refreshTransformsUI();
+    });
+
+    // -- Resize inputs
+    function syncResizeInputs() {
+      document.getElementById('resize-inputs-max').hidden = transformsState.resize.mode !== 'max';
+      document.getElementById('resize-inputs-percentage').hidden = transformsState.resize.mode !== 'percentage';
+      document.getElementById('resize-inputs-exact').hidden = transformsState.resize.mode !== 'exact';
+      resizeUpscaleRow.hidden = !(transformsState.resize.mode === 'max' || transformsState.resize.mode === 'percentage');
+      kernelSel.disabled = transformsState.resize.mode === 'none';
+    }
+    resizeMaxW.addEventListener('input', () => {
+      transformsState.resize.width = Number(resizeMaxW.value) || 0;
+      refreshTransformsUI();
+    });
+    resizeMaxH.addEventListener('input', () => {
+      transformsState.resize.height = Number(resizeMaxH.value) || 0;
+      refreshTransformsUI();
+    });
+    resizePct.addEventListener('input', () => {
+      transformsState.resize.percentage = Number(resizePct.value) || 100;
+      refreshTransformsUI();
+    });
+    resizeExactW.addEventListener('input', () => {
+      transformsState.resize.width = Number(resizeExactW.value) || 0;
+      refreshTransformsUI();
+    });
+    resizeExactH.addEventListener('input', () => {
+      transformsState.resize.height = Number(resizeExactH.value) || 0;
+      refreshTransformsUI();
+    });
+    resizeUpscale.addEventListener('change', () => {
+      transformsState.resize.upscale = resizeUpscale.checked;
+      refreshTransformsUI();
+    });
+
+    // -- Flip
+    flipH.addEventListener('change', () => {
+      transformsState.flip.horizontal = flipH.checked;
+      refreshTransformsUI();
+    });
+    flipV.addEventListener('change', () => {
+      transformsState.flip.vertical = flipV.checked;
+      refreshTransformsUI();
+    });
+
+    // -- Crop
+    cropAspectSel.addEventListener('change', () => {
+      transformsState.crop.aspect = cropAspectSel.value;
+      cropCustomBox.hidden = transformsState.crop.aspect !== 'custom';
+      refreshTransformsUI();
+    });
+    cropCustomW.addEventListener('input', () => {
+      transformsState.crop.customW = Number(cropCustomW.value) || 0;
+      refreshTransformsUI();
+    });
+    cropCustomH.addEventListener('input', () => {
+      transformsState.crop.customH = Number(cropCustomH.value) || 0;
+      refreshTransformsUI();
+    });
+
+    // -- Kernel
+    kernelSel.addEventListener('change', () => {
+      transformsState.kernel = kernelSel.value;
+      refreshTransformsUI();
+    });
+
+    // -- Reset
+    resetBtn.addEventListener('click', () => {
+      transformsState = TRANSFORMS_DEFAULTS();
+      // Reset all inputs to defaults
+      setActiveSegmented(resizeBtnRow, 'none', 'mode');
+      setActiveSegmented(rotateBtnRow, 0, 'rotate');
+      resizeMaxW.value = '';
+      resizeMaxH.value = '';
+      resizePct.value = '100';
+      resizeExactW.value = '';
+      resizeExactH.value = '';
+      resizeUpscale.checked = false;
+      flipH.checked = false;
+      flipV.checked = false;
+      cropAspectSel.value = 'none';
+      cropCustomBox.hidden = true;
+      cropCustomW.value = '';
+      cropCustomH.value = '';
+      kernelSel.value = 'lanczos3';
+      syncResizeInputs();
+      refreshTransformsUI();
+    });
+
+    // Refresh badge + preview + per-row notice from current state.
+    window.refreshTransformsUI = function () {
+      const n = countActiveTransforms();
+      if (n > 0) {
+        badge.textContent = n + ' active';
+        badge.hidden = false;
+        resetBtn.hidden = false;
+      } else {
+        badge.hidden = true;
+        resetBtn.hidden = true;
+      }
+      const preview = computeResizePreview();
+      if (preview) {
+        resizePreview.textContent = '→ ' + preview + ' (preview from first file)';
+        resizePreview.hidden = false;
+      } else {
+        resizePreview.hidden = true;
+      }
+      // Per-row notices may need to mention the active transforms
+      if (typeof refreshFileNotices === 'function') refreshFileNotices();
+    };
+
+    // Initial sync (no-op state, but makes sure UI matches)
+    syncResizeInputs();
+    refreshTransformsUI();
   })();
 
   // Initial render
