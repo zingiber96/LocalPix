@@ -5,6 +5,50 @@ All notable changes to LocalPix will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project loosely follows [Semantic Versioning](https://semver.org/).
 
+## [1.3.0] — 2026-06-10
+
+### Added
+
+- **Per-file settings overrides.** Each file row now has a pencil button
+  that opens an inline settings drawer, detaching that file from the
+  global defaults. The drawer exposes a full format selector and all
+  format-specific options (quality, lossless, effort, etc.) independently
+  for that file. A badge in the row shows the overridden format at a
+  glance; a Reset link reverts to globals.
+- **"Apply to all" button** in the Convert-to header. Pushes the current
+  global settings onto every file in the list, overwriting any per-file
+  customizations — a fast way to re-synchronize after bulk-adding files.
+- **Open folder button** next to Change output folder in the output row.
+  Opens the current output directory in Finder / Explorer without leaving
+  the app. Mirrors the existing Output › Open Output Folder menu item
+  (⌘O) but puts it at the fingertips right after a batch conversion.
+
+### Fixed
+
+- **Batch conversions stopping mid-run** when any file had its per-file
+  settings drawer open. `rebuildOpts` was calling `updateRowOverrideUI`
+  which re-entered `buildDrawerContent` → `rebuildOpts` → infinite
+  recursion → stack overflow caught by `convertFile`'s error handler,
+  marking the file as error and halting the batch. The fix splits
+  responsibility: `rebuildOpts` only rebuilds the options panel; a new
+  `refreshBadge` helper updates the format badge directly from the
+  format-button onclick without touching the drawer.
+
+### Notes / deferred
+
+- Per-file transforms editing (resize, rotate, flip, crop per file) is
+  intentionally deferred to the next release alongside the manual crop
+  overlay feature. The transforms snapshot captured at customization time
+  is preserved and shown read-only in the drawer.
+- Presets (save/recall/delete named settings), filename templates, PDF
+  input, and manual crop boxes are also deferred to the next release.
+
+### Preserved
+
+- WebP byte-identical output guarantee — confirmed again (438-byte match).
+- All v1.2 capabilities: transforms, smart Convert button, batch modes,
+  all supported formats, metadata toggles, output folder picker.
+
 ## [1.2.0] — 2026-05-25
 
 ### Added

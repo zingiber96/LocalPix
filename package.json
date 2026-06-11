@@ -1,6 +1,6 @@
 {
   "name": "localpix",
-  "version": "1.2.0",
+  "version": "1.3.0",
   "description": "Local, offline image converter — batch-convert between JPEG, PNG, WebP, AVIF, GIF, TIFF, BMP, ICO and more.",
   "license": "MIT",
   "author": "James Folsom",

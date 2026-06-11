@@ -145,8 +145,9 @@ async function pickOutputFolder() {
 // IPC handlers exposed via the preload script's contextBridge. Channel names
 // are prefixed with 'localpix:' so they don't collide with channels from
 // other Electron apps if anything ever inspects them globally.
-ipcMain.handle('localpix:get-output-folder', () => getOutputDir());
+ipcMain.handle('localpix:get-output-folder',    () => getOutputDir());
 ipcMain.handle('localpix:select-output-folder', () => pickOutputFolder());
+ipcMain.handle('localpix:open-output-folder',   () => shell.openPath(getOutputDir()));
 
 // macOS Dock icon — swap between light and dark variants when the system
 // appearance changes. This only affects the live Dock icon; the Finder /
@@ -155,8 +156,8 @@ ipcMain.handle('localpix:select-output-folder', () => pickOutputFolder());
 //
 // We lazy-load the NativeImages on first use; loading is cheap and doing it
 // upfront before app.whenReady would error.
-const DOCK_ICON_LIGHT_PATH = path.join(__dirname, '..', 'assets', 'dock-icon-light.png');
-const DOCK_ICON_DARK_PATH = path.join(__dirname, '..', 'assets', 'dock-icon-dark.png');
+const DOCK_ICON_LIGHT_PATH = path.join(__dirname, '..', 'build', 'icon.icns');
+const DOCK_ICON_DARK_PATH = path.join(__dirname, '..', 'build', 'icon-dark.icns');
 let _dockIconLight = null;
 let _dockIconDark = null;
 

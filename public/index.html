@@ -914,7 +914,8 @@
     .file-row {
       display: grid;
       grid-template-columns: 40px 1fr auto;
-      gap: 12px;
+      column-gap: 12px;
+      row-gap: 0;
       align-items: center;
       padding: 10px 12px 10px 10px;
       border: 1px solid var(--border);
@@ -1118,6 +1119,133 @@
         border-top: 1px dashed var(--border);
       }
     }
+
+    /* --- Section header row (label + inline action button) ---------------- */
+
+    .section-header-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 10px;
+    }
+    .section-header-row .section-label { margin-bottom: 0; }
+
+    /* --- Per-file override UI --------------------------------------------- */
+
+    /* Customize toggle button: accent hover instead of danger */
+    .btn-icon.btn-customize:hover {
+      color: var(--accent);
+      background: var(--accent-soft);
+    }
+    .btn-icon.btn-customize.is-open {
+      color: var(--accent);
+      background: var(--accent-soft);
+    }
+
+    /* Subtle accent stripe on customized rows */
+    .file-row.customized {
+      border-left-color: var(--accent);
+    }
+
+    /* Override status bar inside .file-info */
+    .override-bar {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      flex-wrap: wrap;
+      margin-top: 3px;
+    }
+    .override-bar[hidden] { display: none; }
+
+    .override-badge {
+      font-family: var(--font-mono);
+      font-size: 10.5px;
+      background: var(--accent-soft);
+      color: var(--accent);
+      padding: 1px 6px;
+      border-radius: 3px;
+      border: 1px solid var(--accent-ring);
+      font-weight: 600;
+      letter-spacing: 0.02em;
+      flex-shrink: 0;
+    }
+
+    .override-info {
+      font-size: 11px;
+      color: var(--text-muted);
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      flex: 1;
+      min-width: 0;
+    }
+
+    .btn-revert {
+      font-size: 11px;
+      color: var(--text-faint);
+      background: none;
+      border: none;
+      cursor: pointer;
+      padding: 0;
+      text-decoration: underline;
+      text-underline-offset: 2px;
+      flex-shrink: 0;
+    }
+    .btn-revert:hover { color: var(--danger); }
+
+    /* Per-file settings drawer — spans all grid columns */
+    .file-drawer {
+      grid-column: 1 / -1;
+      border-top: 1px solid var(--border);
+      padding: 14px 0 4px;
+      margin-top: 6px;
+    }
+    .file-drawer[hidden] { display: none; }
+
+    .file-drawer-section { margin-bottom: 14px; }
+    .file-drawer-section:last-child { margin-bottom: 0; }
+
+    .file-drawer-label {
+      font-size: 10.5px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--text-faint);
+      margin-bottom: 7px;
+    }
+
+    /* Compact format row inside the drawer */
+    .file-format-mini {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 3px;
+      background: var(--surface-2);
+      padding: 3px;
+      border-radius: var(--radius);
+      border: 1px solid var(--border);
+    }
+    .file-format-mini .format-btn {
+      padding: 4px 8px;
+      font-size: 11px;
+      min-width: 0;
+      flex: 1;
+      text-align: center;
+    }
+
+    /* Per-file options panel: looser single-column layout */
+    .file-opts-panel {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+      gap: 14px 24px;
+    }
+
+    /* Transforms snapshot info line */
+    .override-tx-summary {
+      font-size: 11.5px;
+      color: var(--text-muted);
+      font-style: italic;
+      margin-top: 10px;
+    }
   </style>
 </head>
 <body>
@@ -1175,7 +1303,10 @@
 
   <!-- Format + Options ------------------------------------------------- -->
   <section class="section">
-    <div class="section-label">Convert to</div>
+    <div class="section-header-row">
+      <div class="section-label">Convert to</div>
+      <button type="button" class="btn btn-ghost btn-sm" id="apply-to-all-btn" hidden>Apply to all</button>
+    </div>
 
     <div class="format-bar">
       <div class="format-buttons" id="format-buttons" role="radiogroup" aria-label="Output format">
@@ -1355,9 +1486,8 @@
     <div class="output-row" id="output-folder-row">
       <span class="output-label">Output folder</span>
       <code id="output-folder-path" title="">…</code>
-      <button class="btn btn-secondary btn-sm" id="change-folder-btn" style="display:none;">
-        Change…
-      </button>
+      <button class="btn btn-secondary btn-sm" id="open-folder-btn" style="display:none;">Open folder</button>
+      <button class="btn btn-secondary btn-sm" id="change-folder-btn" style="display:none;">Change…</button>
     </div>
   </section>
 
@@ -1528,6 +1658,10 @@
   let currentOpts = defaultsFor('webp');
   let currentBackground = '#ffffff';
 
+  // Unique IDs for checkbox <label for> pairs so per-file drawers don't clash
+  // with the global options panel (duplicate IDs would break label association).
+  let fieldIdCounter = 0;
+
   const dropZone           = document.getElementById('drop-zone');
   const fileInput          = document.getElementById('file-input');
   const targetSelect       = document.getElementById('target-format');
@@ -1541,6 +1675,7 @@
   const convertMenu        = document.getElementById('convert-menu');
   const convertAltBtn      = document.getElementById('convert-alt-btn');
   const clearBtn           = document.getElementById('clear-btn');
+  const applyToAllBtn      = document.getElementById('apply-to-all-btn');
   const fileList           = document.getElementById('file-list');
   const emptyState         = document.getElementById('empty-state');
   const batchBar           = document.getElementById('batch-bar');
@@ -1637,6 +1772,7 @@
     }
   });
   clearBtn.addEventListener('click', () => clearAll());
+  applyToAllBtn.addEventListener('click', () => applyGlobalToAll());
 
   function defaultsFor(format) {
     const out = {};
@@ -1648,10 +1784,17 @@
     return out;
   }
 
-  // Render the options panel based on the current target and known sources.
+  // Thin wrapper — global panel always calls this zero-arg form so all the
+  // existing call sites (setTargetFormat, refresh, etc.) stay unchanged.
   function renderOptions() {
-    const conf = FORMAT_OPTIONS[currentTarget];
-    optionsPanel.replaceChildren();
+    buildOptionsPanel(optionsPanel, currentTarget, currentOpts, renderOptions);
+  }
+
+  // Parameterized core: renders format options into any container against any
+  // opts object. Used by both the global panel and per-file drawers.
+  function buildOptionsPanel(container, format, opts, onUpdate) {
+    const conf = FORMAT_OPTIONS[format];
+    container.replaceChildren();
     if (!conf) return;
 
     const fields = [...conf.fields];
@@ -1659,40 +1802,44 @@
     // JPEG: append a background color picker when any source might be
     // transparent. The actual flatten happens server-side; the UI proactively
     // exposes the control so the user can pick a fill before converting.
-    if (currentTarget === 'jpeg' && anySourceMayHaveAlpha()) {
+    if (format === 'jpeg' && anySourceMayHaveAlpha()) {
       fields.push({ key: 'background', type: 'color', def: '#ffffff',
         label: 'Background (for transparent sources)' });
     }
 
     for (const f of fields) {
-      if (f.showIf && !f.showIf(currentOpts)) continue;
-      if (f.hideIf && f.hideIf(currentOpts)) continue;
-      optionsPanel.appendChild(renderField(f));
+      if (f.showIf && !f.showIf(opts)) continue;
+      if (f.hideIf && f.hideIf(opts)) continue;
+      container.appendChild(renderField(f, opts, onUpdate));
     }
 
     if (conf.hint) {
       const hint = document.createElement('div');
       hint.className = 'option-hint';
       hint.textContent = conf.hint;
-      optionsPanel.appendChild(hint);
+      container.appendChild(hint);
     }
 
-    // Restart fade-in animation on every re-render
-    optionsPanel.style.animation = 'none';
-    void optionsPanel.offsetWidth;
-    optionsPanel.style.animation = '';
+    // Restart fade-in animation on every re-render (only meaningful on the
+    // global panel; harmless on per-file panels that have no animation rule).
+    container.style.animation = 'none';
+    void container.offsetWidth;
+    container.style.animation = '';
   }
 
-  function renderField(f) {
+  // Render a single option field bound to an explicit opts object.
+  // onUpdate() is called when a checkbox/select changes and the caller needs
+  // to re-evaluate show/hide rules (e.g. webp lossless hides quality slider).
+  function renderField(f, opts, onUpdate) {
     const wrap = el('div', { class: 'control-group' });
 
     if (f.type === 'slider') {
-      const val = currentOpts[f.key] ?? f.def;
+      const val = opts[f.key] ?? f.def;
       const display = el('span', { class: 'slider-value', text: String(val) });
       const range = el('input', {
         type: 'range', min: f.min, max: f.max, value: val,
         oninput: () => {
-          currentOpts[f.key] = Number(range.value);
+          opts[f.key] = Number(range.value);
           display.textContent = range.value;
         },
       });
@@ -1701,32 +1848,32 @@
         el('div', { class: 'slider-row' }, range, display),
       );
     } else if (f.type === 'checkbox') {
-      const checked = currentOpts[f.key] ?? f.def;
-      const id = 'cb-' + f.key;
+      const checked = opts[f.key] ?? f.def;
+      const cbId = 'cb-' + f.key + '-' + (++fieldIdCounter);
       const cb = el('input', {
-        type: 'checkbox', id, checked: !!checked,
+        type: 'checkbox', id: cbId, checked: !!checked,
         onchange: () => {
-          currentOpts[f.key] = cb.checked;
-          renderOptions(); // re-render so show/hide rules apply (e.g. webp lossless)
+          opts[f.key] = cb.checked;
+          onUpdate();
         },
       });
       wrap.append(
         el('div', { class: 'checkbox-row' },
           cb,
-          el('label', { for: id, text: f.label }),
+          el('label', { for: cbId, text: f.label }),
         ),
       );
     } else if (f.type === 'select') {
       const sel = el('select', {
         onchange: () => {
-          currentOpts[f.key] = sel.value;
-          renderOptions();
+          opts[f.key] = sel.value;
+          onUpdate();
         },
       });
       for (const o of f.opts) {
         sel.appendChild(el('option', {
           value: o.value,
-          selected: currentOpts[f.key] === o.value,
+          selected: opts[f.key] === o.value,
           text: o.label,
         }));
       }
@@ -1738,29 +1885,33 @@
       const num = el('input', {
         type: 'number',
         min: f.min ?? '',
-        value: currentOpts[f.key] ?? f.def,
-        oninput: () => { currentOpts[f.key] = Number(num.value); },
+        value: opts[f.key] ?? f.def,
+        oninput: () => { opts[f.key] = Number(num.value); },
       });
       wrap.append(
         el('label', { class: 'field-label', text: f.label }),
         num,
       );
     } else if (f.type === 'color') {
+      // Global panel: persist color across format switches via currentBackground.
+      // Per-file panel: opts.background is the sole source of truth.
+      const isGlobal = (opts === currentOpts);
+      const initVal = isGlobal ? currentBackground : (opts[f.key] ?? f.def ?? '#ffffff');
       const c = el('input', {
         type: 'color',
-        value: currentBackground,
+        value: initVal,
         oninput: () => {
-          currentBackground = c.value;
-          currentOpts.background = c.value;
+          if (isGlobal) currentBackground = c.value;
+          opts[f.key] = c.value;
         },
       });
       wrap.append(
         el('label', { class: 'field-label', text: f.label }),
         c,
       );
-      currentOpts.background = currentBackground;
+      opts[f.key] = initVal;
     } else if (f.type === 'checklist') {
-      const selected = new Set(currentOpts[f.key] ?? f.def);
+      const selected = new Set(opts[f.key] ?? f.def);
       const list = el('div', { class: 'checklist' });
       const cbs = [];
       for (const o of f.opts) {
@@ -1771,7 +1922,7 @@
         list.appendChild(el('label', null, cb, ' ', String(o.label)));
       }
       const updateChecked = () => {
-        currentOpts[f.key] = cbs.filter((x) => x.checked).map((x) => Number(x.value));
+        opts[f.key] = cbs.filter((x) => x.checked).map((x) => Number(x.value));
       };
       for (const cb of cbs) cb.addEventListener('change', updateChecked);
       wrap.append(
@@ -1809,7 +1960,10 @@
     for (const { file, kind } of accepted) {
       const id = nextId++;
       const rowEl = createRow(id, file, kind);
-      files.set(id, { file, kind, rowEl, state: 'pending', naturalW: 0, naturalH: 0 });
+      // override: null means "follow the global default settings". When a
+      // file is customized (Phase 2 UI), this becomes a snapshot:
+      //   { target, opts, transforms }  (transforms is a transformsState shape)
+      files.set(id, { file, kind, rowEl, state: 'pending', naturalW: 0, naturalH: 0, override: null });
       fileList.appendChild(rowEl);
       generateThumb(id, file, kind);
     }
@@ -1823,6 +1977,16 @@
       svgEl('path', { d: 'M4 4l8 8M12 4l-8 8' }),
     );
 
+    // Pencil/customize icon
+    const customizeIcon = svgEl('svg',
+      { viewBox: '0 0 16 16', fill: 'none', stroke: 'currentColor',
+        'stroke-width': 1.6, 'stroke-linecap': 'round', 'stroke-linejoin': 'round' },
+      svgEl('path', { d: 'M11 2.5a1.5 1.5 0 0 1 2.12 2.12L4.5 13.24 2 14l.76-2.5L11 2.5z' }),
+    );
+
+    const overrideBar = el('div', { class: 'override-bar', hidden: true });
+    const drawer      = el('div', { class: 'file-drawer', hidden: true });
+
     const row = el('div',
       { class: 'file-row', dataset: { id: String(id) } },
       el('div', { class: 'thumb-wrap' }),
@@ -1834,11 +1998,17 @@
           el('span', { class: 'original-size', text: formatSize(file.size) }),
           el('span', { class: 'result-info' }),
         ),
+        overrideBar,
         el('div', { class: 'file-notices' }),
       ),
       el('div', { class: 'file-actions' },
         el('div', { class: 'spinner' }),
         el('span', { class: 'download-wrap' }),
+        el('button',
+          { class: 'btn-icon btn-customize', 'aria-label': 'Customize settings for this file',
+            onclick: () => toggleFileDrawer(id) },
+          customizeIcon,
+        ),
         el('button', {
           class: 'btn btn-secondary btn-sm convert-btn',
           text: 'Convert',
@@ -1850,6 +2020,7 @@
           closeIcon,
         ),
       ),
+      drawer,
     );
 
     return row;
@@ -1888,15 +2059,19 @@
   }
 
   // Per-row notices update when the target format or known source dims change.
+  // Uses each file's effective settings (override or globals) so customized
+  // rows show notices for their own format, not the global default.
   function refreshFileNotices() {
-    for (const { file, kind, rowEl, naturalW, naturalH } of files.values()) {
+    for (const entry of files.values()) {
+      const { kind, rowEl, naturalW, naturalH } = entry;
       const slot = rowEl.querySelector('.file-notices');
+      const effective = getEffectiveSettings(entry);
       const notices = [];
 
-      if (currentTarget === 'jpeg' && SOURCE_KINDS_WITH_POSSIBLE_ALPHA.has(kind)) {
+      if (effective.targetFormat === 'jpeg' && SOURCE_KINDS_WITH_POSSIBLE_ALPHA.has(kind)) {
         notices.push('Source may have transparency — will be flattened onto the background color for JPEG output.');
       }
-      if (currentTarget === 'ico' && naturalW > 0 && naturalW !== naturalH) {
+      if (effective.targetFormat === 'ico' && naturalW > 0 && naturalW !== naturalH) {
         notices.push(`Source is ${naturalW}×${naturalH} (not square). Will be padded with transparency.`);
       }
       if (kind === 'psd') {
@@ -1905,10 +2080,12 @@
       if (kind === 'heif') {
         notices.push('HEIF/HEIC input: decoded locally; no HEIC encoder is shipped (use AVIF for similar compression).');
       }
-      if ((kind === 'gif' || kind === 'webp') && currentTarget !== kind) {
+      if ((kind === 'gif' || kind === 'webp') && effective.targetFormat !== kind) {
         notices.push('Animated sources are flattened to the first frame in v1.');
       }
-      const txDescription = describeActiveTransforms();
+      const txDescription = entry.override
+        ? describeActiveTransforms(entry.override.transforms)
+        : describeActiveTransforms();
       if (txDescription) {
         notices.push('Transforms active: ' + txDescription);
       }
@@ -1918,10 +2095,12 @@
   }
 
   // Compose a short human-readable summary of the active transforms, used
-  // in per-row notices so users see at a glance what will happen to each file.
-  function describeActiveTransforms() {
-    if (typeof transformsState === 'undefined') return '';
-    const s = transformsState;
+  // in per-row notices and the per-file drawer. Accepts an optional state
+  // object so per-file override snapshots can be described without touching
+  // the global transformsState.
+  function describeActiveTransforms(state) {
+    const s = state ?? (typeof transformsState !== 'undefined' ? transformsState : null);
+    if (!s) return '';
     const parts = [];
     if (s.resize.mode === 'max') {
       const dims = [s.resize.width, s.resize.height].filter(Boolean).join('×');
@@ -1943,6 +2122,199 @@
     return parts.join(', ');
   }
 
+  // Resolve the effective conversion settings for a file: its own override
+  // snapshot if it's been customized, otherwise the current global defaults.
+  // This is the single seam through which per-file overrides flow — every
+  // consumer (convertFile, the row's format badge, etc.) reads from here.
+  function getEffectiveSettings(entry) {
+    if (entry && entry.override) {
+      return {
+        targetFormat: entry.override.target,
+        opts: entry.override.opts,
+        transformsPayload: getTransformsPayload(entry.override.transforms),
+        customized: true,
+      };
+    }
+    return {
+      targetFormat: currentTarget,
+      opts: currentOpts,
+      transformsPayload: getTransformsPayload(),
+      customized: false,
+    };
+  }
+
+  // Snapshot the current global settings into a file's override, detaching it
+  // from the defaults. Deep-cloned so later global edits don't bleed in.
+  function snapshotGlobalSettings() {
+    return {
+      target: currentTarget,
+      opts: JSON.parse(JSON.stringify(currentOpts)),
+      transforms: JSON.parse(JSON.stringify(transformsState)),
+    };
+  }
+
+  // -- Per-file override actions (UI wired in Phase 2) ----------------------
+  function customizeFile(id) {
+    const entry = files.get(id);
+    if (!entry) return;
+    entry.override = snapshotGlobalSettings();
+    refresh();
+  }
+  function resetFileToDefaults(id) {
+    const entry = files.get(id);
+    if (!entry) return;
+    entry.override = null;
+    refresh();
+  }
+  // "Apply to all" — push the current global settings onto every file,
+  // overwriting any existing per-file customization.
+  function applyGlobalToAll() {
+    for (const entry of files.values()) {
+      entry.override = snapshotGlobalSettings();
+    }
+    refresh();
+  }
+
+  // -- Per-file drawer -------------------------------------------------------
+
+  // Toggle the per-file settings drawer open/closed. Opening detaches the file
+  // from global defaults (if not already customized) and renders the drawer.
+  function toggleFileDrawer(id) {
+    const entry = files.get(id);
+    if (!entry) return;
+    const drawer = entry.rowEl.querySelector('.file-drawer');
+    const btn    = entry.rowEl.querySelector('.btn-customize');
+    const isOpen = !drawer.hidden;
+
+    if (isOpen) {
+      drawer.hidden = true;
+      btn.classList.remove('is-open');
+    } else {
+      if (!entry.override) {
+        entry.override = snapshotGlobalSettings();
+        updateRowOverrideUI(id, entry);
+      }
+      buildDrawerContent(id, entry, drawer);
+      drawer.hidden = false;
+      btn.classList.add('is-open');
+    }
+  }
+
+  // Build (or rebuild) the contents of a file's settings drawer.
+  function buildDrawerContent(id, entry, drawer) {
+    const override = entry.override;
+    drawer.replaceChildren();
+
+    // Options panel node created early so format-button closures can reference it
+    const optsPanel = el('div', { class: 'file-opts-panel' });
+
+    // Rebuild only the options panel. Does NOT call updateRowOverrideUI —
+    // that would re-enter buildDrawerContent for open drawers and recurse.
+    function rebuildOpts() {
+      buildOptionsPanel(optsPanel, override.target, override.opts, rebuildOpts);
+    }
+
+    // Refresh the override-bar badge text without triggering a drawer rebuild.
+    function refreshBadge() {
+      const bar = entry.rowEl.querySelector('.override-bar');
+      if (bar.hidden) return;
+      const txDesc = describeActiveTransforms(override.transforms);
+      bar.replaceChildren(
+        el('span', { class: 'override-badge', text: override.target.toUpperCase() }),
+        el('span', { class: 'override-info', text: txDesc || 'custom settings' }),
+        el('button', { class: 'btn-revert', text: 'Reset',
+          onclick: () => resetFileToDefaults(id) }),
+      );
+    }
+
+    // -- Format selector
+    const FORMATS = ['avif', 'bmp', 'gif', 'ico', 'jpeg', 'jxl', 'png', 'tiff', 'webp'];
+    const FMT_LABELS = {
+      avif: 'AVIF', bmp: 'BMP', gif: 'GIF', ico: 'ICO',
+      jpeg: 'JPEG', jxl: 'JPEG XL', png: 'PNG', tiff: 'TIFF', webp: 'WebP',
+    };
+    const formatMini = el('div', { class: 'file-format-mini', role: 'radiogroup',
+      'aria-label': 'Output format for this file' });
+    for (const fmt of FORMATS) {
+      formatMini.appendChild(el('button', {
+        type: 'button',
+        class: 'format-btn' + (fmt === override.target ? ' active' : ''),
+        role: 'radio',
+        'aria-checked': String(fmt === override.target),
+        dataset: { format: fmt },
+        text: FMT_LABELS[fmt],
+        onclick: () => {
+          override.target = fmt;
+          override.opts = defaultsFor(fmt);
+          formatMini.querySelectorAll('.format-btn').forEach((b) => {
+            const active = b.dataset.format === fmt;
+            b.classList.toggle('active', active);
+            b.setAttribute('aria-checked', String(active));
+          });
+          rebuildOpts();
+          refreshBadge();
+        },
+      }));
+    }
+
+    // Initial options render
+    rebuildOpts();
+
+    // -- Transforms snapshot (read-only — per-file transforms editing in Phase 5)
+    const txDesc = describeActiveTransforms(override.transforms);
+
+    // -- Assemble
+    drawer.appendChild(el('div', { class: 'file-drawer-section' },
+      el('div', { class: 'file-drawer-label', text: 'Format' }),
+      formatMini,
+    ));
+    drawer.appendChild(el('div', { class: 'file-drawer-section' },
+      el('div', { class: 'file-drawer-label', text: 'Options' }),
+      optsPanel,
+    ));
+    if (txDesc) {
+      drawer.appendChild(el('div', { class: 'override-tx-summary',
+        text: 'Transforms at capture: ' + txDesc }));
+    }
+  }
+
+  // Update the override status bar and row chrome to reflect whether the file
+  // is currently customized. Called from refresh() and any action that changes
+  // entry.override.
+  function updateRowOverrideUI(id, entry) {
+    const row        = entry.rowEl;
+    const overrideBar = row.querySelector('.override-bar');
+    const drawer     = row.querySelector('.file-drawer');
+    const btn        = row.querySelector('.btn-customize');
+
+    if (!entry.override) {
+      row.classList.remove('customized');
+      overrideBar.hidden = true;
+      overrideBar.replaceChildren();
+      drawer.hidden = true;
+      btn.classList.remove('is-open');
+      return;
+    }
+
+    row.classList.add('customized');
+    overrideBar.hidden = false;
+
+    const fmtLabel = entry.override.target.toUpperCase();
+    const txDesc   = describeActiveTransforms(entry.override.transforms);
+
+    overrideBar.replaceChildren(
+      el('span', { class: 'override-badge', text: fmtLabel }),
+      el('span', { class: 'override-info',
+        text: txDesc ? txDesc : 'custom settings' }),
+      el('button', { class: 'btn-revert', text: 'Reset',
+        onclick: () => resetFileToDefaults(id) }),
+    );
+
+    // Rebuild open drawer so its format/options reflect any external change
+    // (e.g. "Apply to all" replacing the override snapshot while it was open).
+    if (!drawer.hidden) buildDrawerContent(id, entry, drawer);
+  }
+
   async function convertFile(id) {
     const entry = files.get(id);
     if (!entry || entry.state === 'converting') return;
@@ -1954,27 +2326,27 @@
     const convertBtn = row.querySelector('.convert-btn');
     convertBtn.disabled = true;
 
+    const settings = getEffectiveSettings(entry);
+
     const formData = new FormData();
     formData.append('image', entry.file);
-    formData.append('targetFormat', currentTarget);
-    formData.append('options', JSON.stringify(currentOpts));
+    formData.append('targetFormat', settings.targetFormat);
+    formData.append('options', JSON.stringify(settings.opts));
     if (entry.kind === 'svg') {
       formData.append('inputDensity', svgDensity.value);
     }
     // Metadata toggles. Only send when they deviate from defaults so the
     // server keeps its byte-identical no-op default behavior when both are
-    // at the stock values.
+    // at the stock values. (Privacy toggles stay global in v1.3.)
     const stripEl = document.getElementById('strip-metadata');
     const preserveEl = document.getElementById('preserve-color-profile');
     if (stripEl && !stripEl.checked) formData.append('stripMetadata', 'false');
     if (preserveEl && preserveEl.checked) formData.append('preserveColorProfile', 'true');
 
-    // Cross-cutting transforms (resize, rotate, flip, crop, kernel). Only
-    // sent when the user has actually engaged a control — keeps the byte-
-    // identical guarantee intact for default conversions.
-    const transformsPayload = getTransformsPayload();
-    if (transformsPayload) {
-      formData.append('transforms', JSON.stringify(transformsPayload));
+    // Cross-cutting transforms (resize, rotate, flip, crop, kernel) from the
+    // resolved settings — per-file override or global default.
+    if (settings.transformsPayload) {
+      formData.append('transforms', JSON.stringify(settings.transformsPayload));
     }
 
     try {
@@ -2138,8 +2510,16 @@
     const hasSvg = [...files.values()].some((e) => e.kind === 'svg');
     svgDensityGroup.style.display = hasSvg ? '' : 'none';
 
+    // "Apply to all" only meaningful when there are files to apply to.
+    applyToAllBtn.hidden = count === 0;
+
     renderOptions(); // re-render in case alpha-source state changed
     refreshFileNotices();
+
+    // Sync every row's customized badge / override bar.
+    for (const [id, entry] of files.entries()) {
+      updateRowOverrideUI(id, entry);
+    }
   }
 
   function formatSize(bytes) {
@@ -2221,7 +2601,8 @@
   // Electron mode (window.localpix exists via preload): shows the current
   // folder and exposes a "Change…" button that triggers the native picker.
   const outputFolderPathEl = document.getElementById('output-folder-path');
-  const changeFolderBtn = document.getElementById('change-folder-btn');
+  const openFolderBtn     = document.getElementById('open-folder-btn');
+  const changeFolderBtn   = document.getElementById('change-folder-btn');
 
   function setOutputFolderDisplay(path) {
     outputFolderPathEl.textContent = path || '(unknown)';
@@ -2234,6 +2615,7 @@
       const cfg = await resp.json();
       setOutputFolderDisplay(cfg.outputDir);
       if (window.localpix && cfg.electron) {
+        openFolderBtn.style.display   = '';
         changeFolderBtn.style.display = '';
       }
     } catch (e) {
@@ -2243,6 +2625,13 @@
     }
 
     if (window.localpix) {
+      openFolderBtn.addEventListener('click', async () => {
+        try {
+          await window.localpix.openOutputFolder();
+        } catch (e) {
+          alert(`Could not open output folder: ${e.message}`);
+        }
+      });
       changeFolderBtn.addEventListener('click', async () => {
         try {
           const newPath = await window.localpix.selectOutputFolder();
@@ -2287,8 +2676,10 @@
   // Build the JSON payload to send to the server. Returns null when the
   // state is at all defaults — that keeps the request payload minimal and
   // preserves the WebP byte-identical guarantee for unmodified conversions.
-  function getTransformsPayload() {
-    const s = transformsState;
+  // Accepts an optional state object (a transformsState-shaped value) so
+  // per-file overrides can reuse this; defaults to the global state.
+  function getTransformsPayload(state) {
+    const s = state || transformsState;
     const out = {};
     if (s.resize.mode !== 'none') {
       out.resize = { mode: s.resize.mode, upscale: s.resize.upscale };
