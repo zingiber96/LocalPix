@@ -114,6 +114,9 @@ LocalPix avoids all of that.
 **Can I resize, rotate, or crop images while converting?**
 Yes — open the **Transforms** section in the app (collapsed by default; click the chevron). You can resize (max dimension, percentage, or exact dimensions), rotate in 90° increments, flip horizontally or vertically, crop to a fixed aspect ratio (1:1, 4:3, 3:2, 16:9, or custom), and choose a resampling kernel. Transforms apply in a fixed order — orient → crop → resize — so the result is predictable. The same transforms apply to every file in the batch.
 
+**Can I control how output files are named?**
+Yes — the **Filename** field next to the output folder takes a template with tokens: `{name}` (original name), `{format}`, `{width}`, `{height}`, `{date}`, and `{n}` (auto-incrementing counter). For example `{name}-{width}x{height}` produces `photo-1920x1080.webp`. Leave it empty to keep the original filename.
+
 **Will it support [RAW camera files / other format]?**
 PDF input landed in v1.4 (rendered by MuPDF, one page per conversion). RAW input (DNG, CR2, NEF, ARW, etc.) was investigated for v1.2 — magick-wasm accepts the files but only extracts the small embedded preview thumbnail, not the full demosaiced sensor data, so it's deferred until a real RAW decoder (libraw-wasm or similar) lands in a future version. See [CHANGELOG.md](CHANGELOG.md) and [Issues](../../issues) for current status.
 

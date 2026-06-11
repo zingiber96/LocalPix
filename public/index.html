@@ -460,7 +460,7 @@
       border: 1px solid var(--border);
     }
 
-    select, input[type=number] {
+    select, input[type=number], input[type=text] {
       width: 100%;
       padding: 6px 10px;
       border: 1px solid var(--border-strong);
@@ -473,7 +473,7 @@
       transition: border-color 0.12s, box-shadow 0.12s;
     }
 
-    select:focus, input[type=number]:focus {
+    select:focus, input[type=number]:focus, input[type=text]:focus {
       outline: none;
       border-color: var(--accent);
       box-shadow: 0 0 0 3px var(--accent-ring);
@@ -1497,6 +1497,15 @@
       <button class="btn btn-secondary btn-sm" id="open-folder-btn" style="display:none;">Open folder</button>
       <button class="btn btn-secondary btn-sm" id="change-folder-btn" style="display:none;">Change…</button>
     </div>
+    <div class="output-row" style="margin-top:10px;">
+      <span class="output-label">Filename</span>
+      <input type="text" id="filename-template" placeholder="{name}" spellcheck="false"
+        style="flex:1; min-width:200px; font-family:var(--font-mono); font-size:11.5px;"
+        aria-describedby="filename-template-hint" />
+    </div>
+    <div id="filename-template-hint" style="font-size:11px; color:var(--text-faint); margin-top:6px;">
+      Tokens: <code>{name}</code> <code>{format}</code> <code>{width}</code> <code>{height}</code> <code>{date}</code> <code>{n}</code> — leave empty for the original name
+    </div>
   </section>
 
   <!-- Files ------------------------------------------------------------ -->
@@ -1693,6 +1702,21 @@
   const svgDensity         = document.getElementById('svg-density');
   const pdfPageGroup       = document.getElementById('pdf-page-group');
   const pdfPageInput       = document.getElementById('pdf-page');
+  const filenameTemplateInput = document.getElementById('filename-template');
+
+  // Persist the filename template across sessions (web localStorage; the
+  // Electron app shares the same renderer storage).
+  try {
+    const savedTpl = localStorage.getItem('localpix-filename-template');
+    if (savedTpl) filenameTemplateInput.value = savedTpl;
+  } catch (e) { /* private mode etc. */ }
+  filenameTemplateInput.addEventListener('input', () => {
+    try {
+      const v = filenameTemplateInput.value.trim();
+      if (v) localStorage.setItem('localpix-filename-template', v);
+      else localStorage.removeItem('localpix-filename-template');
+    } catch (e) { /* private mode etc. */ }
+  });
 
   // --- Format selector ------------------------------------------------------
   function setTargetFormat(fmt) {
@@ -2352,6 +2376,12 @@
     }
     if (entry.kind === 'pdf') {
       formData.append('pdfPage', pdfPageInput.value || '1');
+    }
+    // Output filename template. Only sent when it deviates from the default
+    // so untouched conversions keep the minimal, byte-identical request shape.
+    const fnTemplate = filenameTemplateInput.value.trim();
+    if (fnTemplate && fnTemplate !== '{name}') {
+      formData.append('filenameTemplate', fnTemplate);
     }
     // Metadata toggles. Only send when they deviate from defaults so the
     // server keeps its byte-identical no-op default behavior when both are

@@ -365,6 +365,50 @@ function applyMetadataOptions(pipeline, opts) {
   return pipeline;
 }
 
+// -- Filename templates --------------------------------------------------------
+// Render the user's output-filename template into a safe stem (no extension).
+// Tokens: {name} {format} {date} {width} {height} {n}. Unknown {tokens} are
+// left literal. {n} is resolved against the live output dir: the smallest
+// positive integer whose rendered name is free, so a batch naturally counts
+// 1, 2, 3… Sanitization strips path separators and characters that are
+// invalid on macOS/Windows; resolveOutputPath() re-validates downstream.
+function renderFilenameStem(template, tokens, ext) {
+  let stem = String(template)
+    .replaceAll('{name}', tokens.name)
+    .replaceAll('{format}', tokens.format)
+    .replaceAll('{date}', tokens.date)
+    .replaceAll('{width}', tokens.width != null ? String(tokens.width) : '')
+    .replaceAll('{height}', tokens.height != null ? String(tokens.height) : '');
+
+  stem = sanitizeStem(stem);
+  if (!stem.replace(/\{n\}/g, '')) stem = tokens.name + (stem.includes('{n}') ? '_{n}' : '');
+
+  if (stem.includes('{n}')) {
+    const dir = path.resolve(outputDir);
+    for (let n = 1; n < 100000; n++) {
+      const candidate = stem.replaceAll('{n}', String(n));
+      if (!fs.existsSync(path.join(dir, `${candidate}.${ext}`))) return candidate;
+    }
+    // Pathological: 100k collisions — fall through with n stripped and let
+    // resolveOutputPath()'s timestamp suffix disambiguate.
+    stem = stem.replaceAll('{n}', '');
+  }
+  return sanitizeStem(stem) || tokens.name;
+}
+
+function sanitizeStem(s) {
+  return String(s)
+    // eslint-disable-next-line no-control-regex
+    .replace(/[\\/:*?"<>|\x00-\x1f]/g, '-')
+    .replace(/^[\s.]+|[\s.]+$/g, '');
+}
+
+function localDateStr() {
+  const d = new Date();
+  const pad = (x) => String(x).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+}
+
 // -- Output dispatch table ----------------------------------------------------
 // Each entry: { ext, encode(pipeline, opts, ctx) -> Buffer }.
 // To add a future format, add an entry here and a matching entry to
@@ -428,7 +472,7 @@ const ENCODERS = {
 
   jxl: {
     ext: 'jxl',
-    async encode(pipeline, opts) {
+    async encode(pipeline, opts, ctx) {
       // JPEG XL — modern, royalty-free, generally better than WebP at
       // similar quality. Sharp's prebuilt libvips doesn't include libjxl,
       // so we encode via magick-wasm. Default effort 7 matches libjxl's
@@ -440,6 +484,7 @@ const ENCODERS = {
         .ensureAlpha()
         .raw()
         .toBuffer({ resolveWithObject: true });
+      if (ctx) ctx.outDims = { width: info.width, height: info.height };
       return magick.encodeFromRawRgba(
         { width: info.width, height: info.height, data },
         'jxl',
@@ -473,12 +518,13 @@ const ENCODERS = {
 
   bmp: {
     ext: 'bmp',
-    async encode(pipeline) {
+    async encode(pipeline, opts, ctx) {
       // sharp cannot write BMP; produce raw RGBA and hand to magick-wasm.
       const { data, info } = await pipeline
         .ensureAlpha()
         .raw()
         .toBuffer({ resolveWithObject: true });
+      if (ctx) ctx.outDims = { width: info.width, height: info.height };
       return magick.encodeFromRawRgba(
         { width: info.width, height: info.height, data },
         'bmp',
@@ -488,7 +534,7 @@ const ENCODERS = {
 
   ico: {
     ext: 'ico',
-    async encode(pipeline, opts) {
+    async encode(pipeline, opts, ctx) {
       const allowed = [16, 32, 48, 64, 128, 256];
       const requested = Array.isArray(opts.sizes) && opts.sizes.length
         ? opts.sizes.map(Number).filter((n) => allowed.includes(n))
@@ -499,6 +545,10 @@ const ENCODERS = {
       // Materialise the source as a PNG once, then resize from that for each
       // requested icon size. fit:'contain' with transparent padding handles
       // non-square sources (pad, do not crop or stretch).
+      if (ctx) {
+        const largest = sizes[sizes.length - 1];
+        ctx.outDims = { width: largest, height: largest };
+      }
       const srcPng = await pipeline.png().toBuffer();
       const pngBuffers = [];
       for (const size of sizes) {
@@ -654,13 +704,41 @@ function createApp() {
     const sourceKind = detectSourceKind(req.file);
 
     const originalStem = path.parse(req.file.originalname).name;
-    const outputFilename = `${originalStem}.${encoder.ext}`;
-    const outputPath = resolveOutputPath(outputFilename);
+    // Output filename template (v1.4). Absent/blank/'{name}' → the historical
+    // `originalStem.ext` naming, so existing callers see no change.
+    const filenameTemplate = typeof req.body.filenameTemplate === 'string'
+      ? req.body.filenameTemplate.trim()
+      : '';
 
     try {
       let pipeline = await buildSourcePipeline(req.file, sourceKind, { density, pdfPage });
       pipeline = await applyTransforms(pipeline, transforms);
-      const outputBuffer = await encoder.encode(pipeline, opts, { sourceKind });
+      // ctx lets encoders report the encoded dimensions (outDims) for outputs
+      // sharp can't re-read (BMP, JXL, ICO) so {width}/{height} still resolve.
+      const ctx = { sourceKind };
+      const outputBuffer = await encoder.encode(pipeline, opts, ctx);
+
+      let stem = originalStem;
+      if (filenameTemplate && filenameTemplate !== '{name}') {
+        let dims = ctx.outDims || null;
+        if (!dims && /\{(width|height)\}/.test(filenameTemplate)) {
+          try {
+            const m = await sharp(outputBuffer).metadata();
+            dims = { width: m.width, height: m.height };
+          } catch (e) {
+            // Output not sharp-readable and encoder didn't report dims —
+            // the tokens render as empty rather than failing the convert.
+          }
+        }
+        stem = renderFilenameStem(filenameTemplate, {
+          name: originalStem,
+          format: encoder.ext,
+          date: localDateStr(),
+          width: dims ? dims.width : null,
+          height: dims ? dims.height : null,
+        }, encoder.ext);
+      }
+      const outputPath = resolveOutputPath(`${stem}.${encoder.ext}`);
       fs.writeFileSync(outputPath, outputBuffer);
 
       res.json({

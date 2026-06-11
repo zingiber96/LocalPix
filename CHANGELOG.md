@@ -13,6 +13,13 @@ and this project loosely follows [Semantic Versioning](https://semver.org/).
   format. Pages are rendered fully offline by MuPDF (WASM) at 192 dpi;
   a "PDF page to convert" field appears whenever a PDF is in the list
   (out-of-range page numbers clamp to the document's last page).
+- **Output filename templates.** A "Filename" field next to the output
+  folder accepts tokens — `{name}` `{format}` `{width}` `{height}`
+  `{date}` `{n}` — applied when naming converted files. `{n}` finds the
+  first free number in the output folder, so batches count 1, 2, 3….
+  Leaving the field empty (or `{name}`) keeps the original naming, and
+  the timestamp suffix still prevents collisions. The template persists
+  between sessions.
 
 ## [1.3.0] — 2026-06-10
 
