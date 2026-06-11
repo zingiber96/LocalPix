@@ -1252,12 +1252,114 @@
       gap: 14px 24px;
     }
 
-    /* Transforms snapshot info line */
-    .override-tx-summary {
+    /* --- Manual crop modal --------------------------------------------- */
+
+    .crop-backdrop {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.55);
+      display: grid;
+      place-items: center;
+      z-index: 100;
+      padding: 20px;
+    }
+
+    .crop-modal {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      box-shadow: 0 12px 40px rgba(0, 0, 0, 0.35);
+      padding: 14px;
+      max-width: calc(100vw - 40px);
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .crop-modal-bar {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+    .crop-modal-bar select { width: auto; }
+    .crop-modal-bar .crop-readout {
+      font-family: var(--font-mono);
       font-size: 11.5px;
       color: var(--text-muted);
+      margin-left: auto;
+    }
+
+    .crop-stage {
+      position: relative;
+      align-self: center;
+      /* Prevent the browser from hijacking drags for scrolling on touch. */
+      touch-action: none;
+      user-select: none;
+      line-height: 0;
+      cursor: crosshair;
+    }
+    .crop-stage img {
+      max-width: min(760px, calc(100vw - 90px));
+      max-height: 58vh;
+      display: block;
+      border-radius: 4px;
+    }
+
+    .crop-rect {
+      position: absolute;
+      border: 1.5px solid #fff;
+      outline: 1px solid rgba(0, 0, 0, 0.6);
+      /* Dim everything outside the selection */
+      box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.45);
+      cursor: move;
+    }
+    .crop-rect[hidden] { display: none; }
+
+    .crop-handle {
+      position: absolute;
+      width: 12px;
+      height: 12px;
+      background: #fff;
+      border: 1px solid rgba(0, 0, 0, 0.6);
+      border-radius: 2px;
+      /* centred on the rect's corners/edges */
+      margin: -6px;
+    }
+    .crop-handle[data-h="nw"] { left: 0;   top: 0;    cursor: nwse-resize; }
+    .crop-handle[data-h="ne"] { left: 100%; top: 0;   cursor: nesw-resize; }
+    .crop-handle[data-h="sw"] { left: 0;   top: 100%; cursor: nesw-resize; }
+    .crop-handle[data-h="se"] { left: 100%; top: 100%; cursor: nwse-resize; }
+    .crop-handle[data-h="n"]  { left: 50%; top: 0;    cursor: ns-resize; }
+    .crop-handle[data-h="s"]  { left: 50%; top: 100%; cursor: ns-resize; }
+    .crop-handle[data-h="w"]  { left: 0;   top: 50%;  cursor: ew-resize; }
+    .crop-handle[data-h="e"]  { left: 100%; top: 50%; cursor: ew-resize; }
+    .crop-handle[hidden] { display: none; }
+
+    .crop-modal-footer {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      justify-content: flex-end;
+    }
+    .crop-modal-footer .crop-note {
+      font-size: 11px;
+      color: var(--text-faint);
       font-style: italic;
-      margin-top: 10px;
+      margin-right: auto;
+    }
+
+    /* Manual crop controls inside the transforms panel (drawer only) */
+    .crop-manual-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+    .crop-manual-row .crop-box-readout {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--text-muted);
     }
   </style>
 </head>
@@ -2088,7 +2190,9 @@
     if (s.rotate !== 0) parts.push('rotate ' + s.rotate + '°');
     if (s.flip.horizontal) parts.push('flip H');
     if (s.flip.vertical) parts.push('flip V');
-    if (s.crop.aspect !== 'none') {
+    if (s.crop.box && s.crop.box.width > 0) {
+      parts.push('crop ' + s.crop.box.width + '×' + s.crop.box.height + 'px');
+    } else if (s.crop.aspect !== 'none') {
       const label = s.crop.aspect === 'custom'
         ? (s.crop.customW && s.crop.customH ? 'crop ' + s.crop.customW + ':' + s.crop.customH : '')
         : 'crop ' + s.crop.aspect;
@@ -2746,7 +2850,10 @@
     resize: { mode: 'none', width: 0, height: 0, percentage: 100, upscale: false },
     rotate: 0,
     flip: { horizontal: false, vertical: false },
-    crop: { aspect: 'none', customW: 0, customH: 0 },
+    // box: explicit pixel crop from the manual overlay — { left, top, width,
+    // height } in original source pixels, or null. Per-file only (set via
+    // the drawer); when present it wins over the aspect crop.
+    crop: { aspect: 'none', customW: 0, customH: 0, box: null },
     kernel: 'lanczos3',
   });
   let transformsState = TRANSFORMS_DEFAULTS();
@@ -2772,7 +2879,10 @@
     if (s.flip.horizontal || s.flip.vertical) {
       out.flip = { horizontal: !!s.flip.horizontal, vertical: !!s.flip.vertical };
     }
-    if (s.crop.aspect !== 'none') {
+    if (s.crop.box && s.crop.box.width > 0 && s.crop.box.height > 0) {
+      const b = s.crop.box;
+      out.crop = { box: { left: b.left, top: b.top, width: b.width, height: b.height } };
+    } else if (s.crop.aspect !== 'none') {
       out.crop = { aspect: s.crop.aspect };
       if (s.crop.aspect === 'custom') {
         out.crop.customW = s.crop.customW;
@@ -2791,7 +2901,7 @@
     if (s.resize.mode !== 'none') n++;
     if (s.rotate !== 0) n++;
     if (s.flip.horizontal || s.flip.vertical) n++;
-    if (s.crop.aspect !== 'none') n++;
+    if (s.crop.aspect !== 'none' || (s.crop.box && s.crop.box.width > 0)) n++;
     return n;
   }
 
@@ -2809,13 +2919,20 @@
 
     let w = src.naturalW, h = src.naturalH;
 
+    // Explicit pixel crop happens before rotation (box is in source pixels)
+    const hasBox = s.crop.box && s.crop.box.width > 0 && s.crop.box.height > 0;
+    if (hasBox) {
+      w = Math.min(s.crop.box.width, Math.max(1, w - s.crop.box.left));
+      h = Math.min(s.crop.box.height, Math.max(1, h - s.crop.box.top));
+    }
+
     // Rotate
     if (s.rotate === 90 || s.rotate === 270) {
       [w, h] = [h, w];
     }
 
     // Crop
-    if (s.crop.aspect !== 'none') {
+    if (!hasBox && s.crop.aspect !== 'none') {
       const ratio = parseCropAspect(s.crop);
       if (ratio) {
         const srcAspect = w / h;
@@ -2861,6 +2978,251 @@
           ? [crop.customW, crop.customH] : null;
       default: return null;
     }
+  }
+
+  // -- Manual crop overlay -----------------------------------------------------
+  // Modal drag-to-crop editor. Displays the source image fit to the viewport
+  // and lets the user draw/move/resize a crop rectangle with corner + edge
+  // handles, optional aspect lock, and a live source-pixel readout.
+  //
+  // Coordinate model: the rectangle is tracked in DISPLAY pixels relative to
+  // the rendered <img>; scale = naturalWidth / displayWidth maps it to source
+  // pixels on apply. The box is stored in ORIGINAL source coordinates and the
+  // server applies it before rotate/flip, so what's drawn here is exactly the
+  // region kept regardless of other active transforms.
+  //
+  // Pointer Events (with capture) drive all interaction — mouse and touch
+  // share one code path; the stage sets touch-action:none so drags aren't
+  // hijacked for scrolling.
+  function openCropModal(entry, state, onDone) {
+    if (!entry || !entry.naturalW || !entry.naturalH) return;
+    const naturalW = entry.naturalW, naturalH = entry.naturalH;
+
+    const url = URL.createObjectURL(entry.file);
+    const img = el('img', { src: url, alt: 'Crop preview', draggable: false });
+
+    const HANDLES = ['nw', 'n', 'ne', 'e', 'se', 's', 'sw', 'w'];
+    const rect = el('div', { class: 'crop-rect' },
+      ...HANDLES.map((h) => el('div', { class: 'crop-handle', dataset: { h } })));
+    const stage = el('div', { class: 'crop-stage' }, img, rect);
+
+    const readout = el('span', { class: 'crop-readout', text: '' });
+    const aspectSel = el('select', { 'aria-label': 'Aspect lock' });
+    for (const [value, label] of [
+      ['free', 'Free'], ['1:1', '1:1'], ['4:3', '4:3'],
+      ['3:2', '3:2'], ['16:9', '16:9'],
+    ]) {
+      aspectSel.appendChild(el('option', { value, text: label }));
+    }
+
+    const applyBtn = el('button', { class: 'btn btn-primary btn-sm', type: 'button', text: 'Apply crop' });
+    const clearBtn = el('button', { class: 'btn btn-secondary btn-sm', type: 'button', text: 'Clear crop' });
+    const cancelBtn = el('button', { class: 'btn btn-ghost btn-sm', type: 'button', text: 'Cancel' });
+
+    const modal = el('div', { class: 'crop-modal', role: 'dialog', 'aria-label': 'Crop image' },
+      el('div', { class: 'crop-modal-bar' },
+        el('span', { class: 'field-label', text: 'Aspect lock', style: { marginBottom: '0' } }),
+        aspectSel,
+        readout,
+      ),
+      stage,
+      el('div', { class: 'crop-modal-footer' },
+        el('span', { class: 'crop-note',
+          text: 'Drag to select · crop applies before rotation/resize' }),
+        cancelBtn, clearBtn, applyBtn,
+      ),
+    );
+    const backdrop = el('div', { class: 'crop-backdrop' }, modal);
+
+    // --- Geometry state (display px, relative to the rendered image) -------
+    let dispW = 0, dispH = 0, scale = 1;
+    // r is the live crop rectangle in display px.
+    let r = { x: 0, y: 0, w: 0, h: 0 };
+    const MIN = 8; // px, display space
+
+    function lockRatio() {
+      const v = aspectSel.value;
+      if (v === 'free') return null;
+      const [a, b] = v.split(':').map(Number);
+      return a / b;
+    }
+
+    function toSource() {
+      return {
+        left: Math.max(0, Math.min(naturalW - 1, Math.round(r.x * scale))),
+        top: Math.max(0, Math.min(naturalH - 1, Math.round(r.y * scale))),
+        width: Math.max(1, Math.min(naturalW, Math.round(r.w * scale))),
+        height: Math.max(1, Math.min(naturalH, Math.round(r.h * scale))),
+      };
+    }
+
+    function renderRect() {
+      rect.style.left = r.x + 'px';
+      rect.style.top = r.y + 'px';
+      rect.style.width = r.w + 'px';
+      rect.style.height = r.h + 'px';
+      const s = toSource();
+      readout.textContent = `${s.width} × ${s.height} px  @ (${s.left}, ${s.top})`;
+      // Edge handles fight the aspect lock — corners only when locked.
+      const locked = !!lockRatio();
+      rect.querySelectorAll('.crop-handle').forEach((hEl) => {
+        hEl.hidden = locked && ['n', 's', 'e', 'w'].includes(hEl.dataset.h);
+      });
+    }
+
+    function setRect(x, y, w, h) {
+      r = {
+        x: Math.max(0, Math.min(x, dispW - MIN)),
+        y: Math.max(0, Math.min(y, dispH - MIN)),
+        w: 0, h: 0,
+      };
+      r.w = Math.max(MIN, Math.min(w, dispW - r.x));
+      r.h = Math.max(MIN, Math.min(h, dispH - r.y));
+      renderRect();
+    }
+
+    // Build a rect from a fixed anchor to the pointer, honoring aspect lock
+    // and image bounds. Used for fresh drags and corner resizes.
+    function rectFromAnchor(ax, ay, px, py) {
+      const ratio = lockRatio();
+      px = Math.max(0, Math.min(px, dispW));
+      py = Math.max(0, Math.min(py, dispH));
+      let w = Math.abs(px - ax), h = Math.abs(py - ay);
+      const availW = px >= ax ? dispW - ax : ax;
+      const availH = py >= ay ? dispH - ay : ay;
+      if (ratio) {
+        w = Math.min(Math.max(w, h * ratio), availW, availH * ratio);
+        h = w / ratio;
+      } else {
+        w = Math.min(w, availW);
+        h = Math.min(h, availH);
+      }
+      const x = px >= ax ? ax : ax - w;
+      const y = py >= ay ? ay : ay - h;
+      setRect(x, y, w, h);
+    }
+
+    // --- Pointer interaction ----------------------------------------------
+    // drag.mode: 'new' (fresh selection), 'move', or a handle name.
+    let drag = null;
+
+    function stagePoint(e) {
+      const b = img.getBoundingClientRect();
+      return { x: e.clientX - b.left, y: e.clientY - b.top };
+    }
+
+    stage.addEventListener('pointerdown', (e) => {
+      if (e.button !== undefined && e.button !== 0) return;
+      e.preventDefault();
+      const p = stagePoint(e);
+      const handle = e.target.closest('.crop-handle');
+      if (handle) {
+        const h = handle.dataset.h;
+        // Anchor = the corner/edge opposite the grabbed handle.
+        const anchor = {
+          nw: { x: r.x + r.w, y: r.y + r.h }, se: { x: r.x, y: r.y },
+          ne: { x: r.x, y: r.y + r.h },       sw: { x: r.x + r.w, y: r.y },
+          n: { y: r.y + r.h }, s: { y: r.y }, w: { x: r.x + r.w }, e: { x: r.x },
+        }[h];
+        drag = { mode: h, anchor, r0: { ...r } };
+      } else if (e.target === rect || rect.contains(e.target)) {
+        drag = { mode: 'move', start: p, r0: { ...r } };
+      } else {
+        drag = { mode: 'new', anchor: { x: p.x, y: p.y } };
+        rectFromAnchor(p.x, p.y, p.x, p.y);
+      }
+      try { stage.setPointerCapture(e.pointerId); } catch (err) { /* synthetic events */ }
+    });
+
+    stage.addEventListener('pointermove', (e) => {
+      if (!drag) return;
+      const p = stagePoint(e);
+      const m = drag.mode;
+      if (m === 'move') {
+        const dx = p.x - drag.start.x, dy = p.y - drag.start.y;
+        setRect(
+          Math.max(0, Math.min(drag.r0.x + dx, dispW - drag.r0.w)),
+          Math.max(0, Math.min(drag.r0.y + dy, dispH - drag.r0.h)),
+          drag.r0.w, drag.r0.h,
+        );
+      } else if (m === 'new' || ['nw', 'ne', 'sw', 'se'].includes(m)) {
+        rectFromAnchor(drag.anchor.x, drag.anchor.y, p.x, p.y);
+      } else if (m === 'e' || m === 'w') {
+        const ax = drag.anchor.x;
+        const px = Math.max(0, Math.min(p.x, dispW));
+        const w = Math.abs(px - ax);
+        setRect(Math.min(ax, px), drag.r0.y, w, drag.r0.h);
+      } else if (m === 'n' || m === 's') {
+        const ay = drag.anchor.y;
+        const py = Math.max(0, Math.min(p.y, dispH));
+        const h = Math.abs(py - ay);
+        setRect(drag.r0.x, Math.min(ay, py), drag.r0.w, h);
+      }
+    });
+
+    const endDrag = () => { drag = null; };
+    stage.addEventListener('pointerup', endDrag);
+    stage.addEventListener('pointercancel', endDrag);
+
+    // Re-lock the current rect when the user picks an aspect (keep the
+    // center, fit the largest locked rect inside the current one).
+    aspectSel.addEventListener('change', () => {
+      const ratio = lockRatio();
+      if (ratio) {
+        const cx = r.x + r.w / 2, cy = r.y + r.h / 2;
+        let w = r.w, h = w / ratio;
+        if (h > r.h) { h = r.h; w = h * ratio; }
+        setRect(cx - w / 2, cy - h / 2, w, h);
+      }
+      renderRect();
+    });
+
+    // --- Lifecycle ----------------------------------------------------------
+    function close() {
+      URL.revokeObjectURL(url);
+      document.removeEventListener('keydown', onKey);
+      backdrop.remove();
+    }
+    function onKey(e) {
+      if (e.key === 'Escape') close();
+    }
+    document.addEventListener('keydown', onKey);
+    backdrop.addEventListener('pointerdown', (e) => {
+      if (e.target === backdrop) close();
+    });
+    cancelBtn.addEventListener('click', close);
+
+    applyBtn.addEventListener('click', () => {
+      state.crop.box = toSource();
+      state.crop.aspect = 'none'; // box wins; avoid double-crop confusion
+      close();
+      onDone();
+    });
+    clearBtn.addEventListener('click', () => {
+      state.crop.box = null;
+      close();
+      onDone();
+    });
+
+    img.addEventListener('load', () => {
+      dispW = img.clientWidth;
+      dispH = img.clientHeight;
+      scale = naturalW / dispW;
+      const b = state.crop.box;
+      if (b && b.width > 0) {
+        // Existing box → display coords
+        setRect(b.left / scale, b.top / scale, b.width / scale, b.height / scale);
+      } else {
+        // Default: centered 80% selection
+        setRect(dispW * 0.1, dispH * 0.1, dispW * 0.8, dispH * 0.8);
+      }
+    });
+    img.addEventListener('error', () => {
+      close();
+      alert('Could not load a preview of this image for cropping.');
+    });
+
+    document.body.appendChild(backdrop);
   }
 
   // Build the full transforms control set (resize, rotate/flip, crop, kernel)
@@ -2992,6 +3354,27 @@
     const cropCustomBox = el('div', { class: 'crop-custom-inputs' },
       cropW, el('span', { class: 'resize-sep', text: ':' }), cropH);
 
+    // Manual pixel crop — per-file only (needs one concrete image), so it
+    // renders only in drawer instances where previewEntry is provided.
+    let cropBtn = null, cropBoxReadout = null, cropClearBtn = null, cropManualRow = null;
+    if (previewEntry) {
+      const canPreview = !['psd', 'heif', 'tiff', 'bmp', 'pdf'].includes(previewEntry.kind);
+      cropBtn = el('button', {
+        type: 'button', class: 'btn btn-secondary btn-sm', text: 'Crop…',
+        disabled: !canPreview,
+        title: canPreview ? 'Draw a crop region on the image'
+          : 'Manual crop needs a format the browser can preview',
+        onclick: () => openCropModal(previewEntry, state, changed),
+      });
+      cropBoxReadout = el('span', { class: 'crop-box-readout' });
+      cropClearBtn = el('button', {
+        type: 'button', class: 'btn-revert', text: 'Clear', hidden: true,
+        onclick: () => { state.crop.box = null; changed(); },
+      });
+      cropManualRow = el('div', { class: 'crop-manual-row' },
+        cropBtn, cropBoxReadout, cropClearBtn);
+    }
+
     // -- Kernel row
     const kernelSel = el('select', {
       class: 'transforms-kernel',
@@ -3012,6 +3395,16 @@
       exactBox.hidden = state.resize.mode !== 'exact';
       upscaleRow.hidden = !(state.resize.mode === 'max' || state.resize.mode === 'percentage');
       kernelSel.disabled = state.resize.mode === 'none';
+      const box = state.crop.box && state.crop.box.width > 0 ? state.crop.box : null;
+      // A manual pixel box supersedes the aspect crop.
+      cropSel.disabled = !!box;
+      cropCustomBox.hidden = !!box || state.crop.aspect !== 'custom';
+      if (cropBtn) {
+        cropBtn.textContent = box ? 'Edit crop…' : 'Crop…';
+        cropBoxReadout.textContent = box
+          ? `${box.width}×${box.height}px @ (${box.left}, ${box.top})` : '';
+        cropClearBtn.hidden = !box;
+      }
       const preview = computeResizePreview(state, previewEntry);
       if (preview) {
         previewLine.textContent = '→ ' + preview
@@ -3032,18 +3425,13 @@
         rotateSeg,
         el('div', { class: 'flip-row' }, flipHRow, flipVRow)),
       el('div', { class: 'transforms-row' },
-        el('div', { class: 'field-label', text: 'Crop to aspect' }),
-        el('div', { class: 'transforms-aspect-row' }, cropSel, cropCustomBox)),
+        el('div', { class: 'field-label', text: previewEntry ? 'Crop' : 'Crop to aspect' }),
+        el('div', { class: 'transforms-aspect-row' }, cropSel, cropCustomBox),
+        cropManualRow),
       el('div', { class: 'transforms-row' },
         el('div', { class: 'field-label', text: 'Resample kernel' }),
         kernelSel),
     );
-
-    function syncCropVisibility() {
-      cropCustomBox.hidden = state.crop.aspect !== 'custom';
-    }
-    syncCropVisibility();
-    cropSel.addEventListener('change', syncCropVisibility);
 
     return { sync };
   }

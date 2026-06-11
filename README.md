@@ -112,7 +112,10 @@ Online converters upload your image to their server, process it, and let you dow
 LocalPix avoids all of that.
 
 **Can I resize, rotate, or crop images while converting?**
-Yes — open the **Transforms** section in the app (collapsed by default; click the chevron). You can resize (max dimension, percentage, or exact dimensions), rotate in 90° increments, flip horizontally or vertically, crop to a fixed aspect ratio (1:1, 4:3, 3:2, 16:9, or custom), and choose a resampling kernel. Transforms apply in a fixed order — orient → crop → resize — so the result is predictable. The same transforms apply to every file in the batch.
+Yes — open the **Transforms** section in the app (collapsed by default; click the chevron). You can resize (max dimension, percentage, or exact dimensions), rotate in 90° increments, flip horizontally or vertically, crop to a fixed aspect ratio (1:1, 4:3, 3:2, 16:9, or custom), and choose a resampling kernel. Transforms apply in a fixed order — crop → orient → resize — so the result is predictable. Global transforms apply to every file; the pencil button on a file row opens per-file settings (format, options, and transforms) that override the globals for just that file.
+
+**Can I crop to an exact region instead of an aspect ratio?**
+Yes — open a file's per-file settings (pencil button) and click **Crop…** in the Transforms section. Drag to select the region (corner/edge handles, optional aspect lock, live pixel readout); the selection is stored in source pixels and applied before any rotation or resize. Manual crop needs a format the browser can preview (not PSD/HEIF/TIFF/BMP/PDF).
 
 **Can I control how output files are named?**
 Yes — the **Filename** field next to the output folder takes a template with tokens: `{name}` (original name), `{format}`, `{width}`, `{height}`, `{date}`, and `{n}` (auto-incrementing counter). For example `{name}-{width}x{height}` produces `photo-1920x1080.webp`. Leave it empty to keep the original filename.

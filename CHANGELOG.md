@@ -26,6 +26,12 @@ and this project loosely follows [Semantic Versioning](https://semver.org/).
   next to the Convert-to header; Delete removes the selected preset.
   Presets persist in the desktop app's config file (next to the output
   folder choice) and in localStorage in web mode.
+- **Manual crop.** A "Crop…" button in the per-file drawer opens a
+  drag-to-crop editor: draw, move, and resize a selection with corner and
+  edge handles, lock the aspect ratio (1:1, 4:3, 3:2, 16:9), and read the
+  live size in source pixels. The crop is stored in original source
+  coordinates and applied before rotation/resize, so what you draw is
+  exactly the region kept. Works with mouse and touch.
 - **Per-file transforms editing.** The per-file settings drawer now hosts
   a fully editable Transforms panel (resize, rotate, flip, crop, kernel)
   bound to that file's override — previously transforms were snapshotted
@@ -36,6 +42,9 @@ and this project loosely follows [Semantic Versioning](https://semver.org/).
 
 - Hidden buttons (e.g. the Transforms "Reset") could stay visible because
   the `.btn` display rule overrode the `hidden` attribute.
+- Combining rotate 90°/270° with an aspect-ratio crop or percentage
+  resize used the pre-rotation dimensions, producing wrong crop geometry.
+  Transform steps now track the running dimensions through the pipeline.
 
 ## [1.3.0] — 2026-06-10
 

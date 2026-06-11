@@ -207,38 +207,55 @@ function packIco(pngBuffers, sizes) {
 async function applyTransforms(pipeline, t) {
   if (!t || typeof t !== 'object') return pipeline;
 
-  // Source dims are lazily fetched — only needed for crop and percentage
-  // resize. clone() so the metadata read doesn't consume the pipeline.
-  let _meta;
-  async function meta() {
-    if (!_meta) _meta = await pipeline.clone().metadata();
-    return _meta;
-  }
-
   let p = pipeline;
 
-  // 1) Rotate. Only fixed 90° increments are accepted; anything else is a
+  // Track the logical width/height through each step so the later steps
+  // (aspect crop, percentage resize) see post-transform dimensions instead
+  // of the original metadata. One cheap header read up front; only runs
+  // when a transforms payload is present, so the byte-identical default
+  // path never touches it.
+  const meta0 = await pipeline.clone().metadata();
+  let curW = meta0.width || 0;
+  let curH = meta0.height || 0;
+
+  // 1) Explicit pixel crop (the manual crop overlay). The box is expressed
+  //    in ORIGINAL source pixels — what the user drew on the un-rotated
+  //    preview — so it's applied before any orientation change. When a box
+  //    is present the aspect-ratio crop below is skipped.
+  const explicitBox = parseExplicitCropBox(t.crop);
+  if (explicitBox && curW && curH) {
+    const c = clampCropBox(explicitBox, curW, curH);
+    if (c) {
+      p = p.extract(c);
+      curW = c.width;
+      curH = c.height;
+    }
+  }
+
+  // 2) Rotate. Only fixed 90° increments are accepted; anything else is a
   //    no-op so a malformed input doesn't accidentally rotate by 7°.
   if (t.rotate === 90 || t.rotate === 180 || t.rotate === 270) {
     p = p.rotate(t.rotate);
+    if (t.rotate !== 180) [curW, curH] = [curH, curW];
   }
 
-  // 2) Flip. sharp.flip() is vertical (top↔bottom mirror); .flop() is
+  // 3) Flip. sharp.flip() is vertical (top↔bottom mirror); .flop() is
   //    horizontal (left↔right). Apply each independently.
   if (t.flip && t.flip.vertical) p = p.flip();
   if (t.flip && t.flip.horizontal) p = p.flop();
 
-  // 3) Crop to aspect ratio (center crop).
-  const cropAspect = parseCropAspect(t.crop);
-  if (cropAspect) {
-    const m = await meta();
-    if (m.width && m.height) {
-      const cropBox = computeCenterCrop(m.width, m.height, cropAspect[0], cropAspect[1]);
-      if (cropBox) p = p.extract(cropBox);
+  // 4) Crop to aspect ratio (center crop) — post-rotation dimensions.
+  const cropAspect = explicitBox ? null : parseCropAspect(t.crop);
+  if (cropAspect && curW && curH) {
+    const cropBox = computeCenterCrop(curW, curH, cropAspect[0], cropAspect[1]);
+    if (cropBox) {
+      p = p.extract(cropBox);
+      curW = cropBox.width;
+      curH = cropBox.height;
     }
   }
 
-  // 4) Resize.
+  // 5) Resize.
   if (t.resize && t.resize.mode && t.resize.mode !== 'none') {
     const kernel = ['nearest', 'cubic', 'mitchell', 'lanczos2', 'lanczos3'].includes(t.kernel)
       ? t.kernel
@@ -273,18 +290,41 @@ async function applyTransforms(pipeline, t) {
       const pct = parsePositiveInt(t.resize.percentage);
       // pct === 100 is a no-op; pct > 100 with upscale=false is also a
       // no-op (user explicitly disabled enlargement).
-      if (pct && pct !== 100 && !(pct > 100 && !upscale)) {
-        const m = await meta();
-        if (m.width && m.height) {
-          const w = Math.max(1, Math.round((m.width * pct) / 100));
-          const h = Math.max(1, Math.round((m.height * pct) / 100));
-          p = p.resize({ width: w, height: h, fit: 'fill', kernel });
-        }
+      if (pct && pct !== 100 && !(pct > 100 && !upscale) && curW && curH) {
+        const w = Math.max(1, Math.round((curW * pct) / 100));
+        const h = Math.max(1, Math.round((curH * pct) / 100));
+        p = p.resize({ width: w, height: h, fit: 'fill', kernel });
       }
     }
   }
 
   return p;
+}
+
+// Parse the manual crop overlay's explicit pixel box from a transforms crop
+// object: { box: { left, top, width, height } } in original source pixels.
+// Returns null for anything malformed.
+function parseExplicitCropBox(crop) {
+  if (!crop || typeof crop !== 'object' || !crop.box || typeof crop.box !== 'object') return null;
+  const left = Number.parseInt(crop.box.left, 10);
+  const top = Number.parseInt(crop.box.top, 10);
+  const width = Number.parseInt(crop.box.width, 10);
+  const height = Number.parseInt(crop.box.height, 10);
+  if (![left, top, width, height].every(Number.isFinite)) return null;
+  if (left < 0 || top < 0 || width <= 0 || height <= 0) return null;
+  return { left, top, width, height };
+}
+
+// Clamp a crop box to the image bounds. Returns null when the box lies
+// entirely outside the image (in which case the crop is skipped).
+function clampCropBox(box, srcW, srcH) {
+  if (box.left >= srcW || box.top >= srcH) return null;
+  return {
+    left: box.left,
+    top: box.top,
+    width: Math.min(box.width, srcW - box.left),
+    height: Math.min(box.height, srcH - box.top),
+  };
 }
 
 function parsePositiveInt(v) {
