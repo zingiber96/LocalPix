@@ -1134,6 +1134,15 @@
     }
     .section-header-row .section-label { margin-bottom: 0; }
 
+    .preset-bar {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      flex-wrap: wrap;
+    }
+    .preset-bar select { font-size: 11.5px; padding: 4px 8px; }
+    #preset-delete:hover { color: var(--danger); }
+
     /* --- Per-file override UI --------------------------------------------- */
 
     /* Customize toggle button: accent hover instead of danger */
@@ -1309,7 +1318,14 @@
   <section class="section">
     <div class="section-header-row">
       <div class="section-label">Convert to</div>
-      <button type="button" class="btn btn-ghost btn-sm" id="apply-to-all-btn" hidden>Apply to all</button>
+      <div class="preset-bar">
+        <select id="preset-select" aria-label="Settings presets" style="width:auto; min-width:130px;">
+          <option value="">Presets…</option>
+        </select>
+        <button type="button" class="btn btn-ghost btn-sm" id="preset-save">Save…</button>
+        <button type="button" class="btn btn-ghost btn-sm" id="preset-delete" hidden>Delete</button>
+        <button type="button" class="btn btn-ghost btn-sm" id="apply-to-all-btn" hidden>Apply to all</button>
+      </div>
     </div>
 
     <div class="format-bar">
@@ -2641,6 +2657,87 @@
     syncPreserveEnabled();
   })();
 
+  // -- Settings presets -------------------------------------------------------
+  // Named snapshots of the global settings (target + opts + transforms) —
+  // the same shape per-file overrides use (snapshotGlobalSettings()).
+  // Persistence: Electron stores them in userData/config.json over IPC
+  // (mirroring output-folder persistence); web mode falls back to
+  // localStorage.
+  (function initPresets() {
+    const sel = document.getElementById('preset-select');
+    const saveBtn = document.getElementById('preset-save');
+    const deleteBtn = document.getElementById('preset-delete');
+
+    const store = {
+      async load() {
+        if (window.localpix && window.localpix.getPresets) {
+          try { return (await window.localpix.getPresets()) || {}; } catch (e) { return {}; }
+        }
+        try { return JSON.parse(localStorage.getItem('localpix-presets')) || {}; } catch (e) { return {}; }
+      },
+      async save(presets) {
+        if (window.localpix && window.localpix.setPresets) {
+          try { await window.localpix.setPresets(presets); return; } catch (e) { /* fall back below */ }
+        }
+        try { localStorage.setItem('localpix-presets', JSON.stringify(presets)); } catch (e) { /* private mode */ }
+      },
+    };
+
+    let presets = {};
+
+    function rebuildDropdown(selected) {
+      sel.replaceChildren(el('option', { value: '', text: 'Presets…' }));
+      for (const name of Object.keys(presets).sort((a, b) => a.localeCompare(b))) {
+        sel.appendChild(el('option', { value: name, text: name }));
+      }
+      sel.value = selected && presets[selected] ? selected : '';
+      deleteBtn.hidden = !sel.value;
+    }
+
+    function applyPreset(p) {
+      if (!p || !FORMAT_OPTIONS[p.target]) return;
+      setTargetFormat(p.target); // resets currentOpts to format defaults
+      // Layer the preset's opts over fresh defaults so presets saved by a
+      // version with different fields still produce a complete opts object.
+      currentOpts = { ...defaultsFor(p.target), ...JSON.parse(JSON.stringify(p.opts || {})) };
+      if (typeof currentOpts.background === 'string') {
+        currentBackground = currentOpts.background;
+      }
+      renderOptions();
+      const tx = { ...TRANSFORMS_DEFAULTS(), ...JSON.parse(JSON.stringify(p.transforms || {})) };
+      setGlobalTransformsState(tx);
+      refreshFileNotices();
+    }
+
+    sel.addEventListener('change', () => {
+      deleteBtn.hidden = !sel.value;
+      if (sel.value && presets[sel.value]) applyPreset(presets[sel.value]);
+    });
+
+    saveBtn.addEventListener('click', async () => {
+      const name = (window.prompt('Preset name:', sel.value || '') || '').trim();
+      if (!name) return;
+      if (presets[name] && !window.confirm(`Replace existing preset "${name}"?`)) return;
+      presets[name] = snapshotGlobalSettings();
+      await store.save(presets);
+      rebuildDropdown(name);
+    });
+
+    deleteBtn.addEventListener('click', async () => {
+      const name = sel.value;
+      if (!name || !presets[name]) return;
+      if (!window.confirm(`Delete preset "${name}"?`)) return;
+      delete presets[name];
+      await store.save(presets);
+      rebuildDropdown('');
+    });
+
+    store.load().then((p) => {
+      presets = (p && typeof p === 'object' && !Array.isArray(p)) ? p : {};
+      rebuildDropdown('');
+    });
+  })();
+
   // -- Transforms (resize, rotate, flip, crop, kernel) ----------------------
   // Single source of truth for the section's state. Parallel to currentOpts
   // (per-format options) and the metadata toggles. Serialized into the
@@ -2972,11 +3069,17 @@
       toggleBtn.setAttribute('aria-expanded', String(!open));
     });
 
-    // -- Reset: swap in a fresh defaults object and re-render the panel.
-    resetBtn.addEventListener('click', () => {
-      transformsState = TRANSFORMS_DEFAULTS();
+    // Replace the global transforms state wholesale and re-render the panel.
+    // Used by Reset and by preset recall.
+    window.setGlobalTransformsState = function (next) {
+      transformsState = next;
       renderGlobalTransforms();
       refreshTransformsUI();
+    };
+
+    // -- Reset: swap in a fresh defaults object and re-render the panel.
+    resetBtn.addEventListener('click', () => {
+      setGlobalTransformsState(TRANSFORMS_DEFAULTS());
     });
 
     // Refresh badge + preview + per-row notice from current state.

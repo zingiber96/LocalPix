@@ -21,6 +21,11 @@ and this project loosely follows [Semantic Versioning](https://semver.org/).
   the timestamp suffix still prevents collisions. The template persists
   between sessions.
 
+- **Settings presets.** Save the current global settings (format +
+  options + transforms) under a name and recall them from a dropdown
+  next to the Convert-to header; Delete removes the selected preset.
+  Presets persist in the desktop app's config file (next to the output
+  folder choice) and in localStorage in web mode.
 - **Per-file transforms editing.** The per-file settings drawer now hosts
   a fully editable Transforms panel (resize, rotate, flip, crop, kernel)
   bound to that file's override — previously transforms were snapshotted
