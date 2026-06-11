@@ -5,7 +5,7 @@ All notable changes to LocalPix will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project loosely follows [Semantic Versioning](https://semver.org/).
 
-## [Unreleased]
+## [1.4.0] — 2026-06-10 "Full Control"
 
 ### Added
 
