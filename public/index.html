@@ -1291,14 +1291,14 @@
         <em>Drop images</em> here, or <em>click to browse</em>
       </div>
       <div class="drop-formats">
-        JPEG · PNG · WebP · AVIF · GIF · HEIF/HEIC · TIFF · BMP · SVG · PSD
+        JPEG · PNG · WebP · AVIF · GIF · HEIF/HEIC · TIFF · BMP · SVG · PSD · PDF
       </div>
       <div class="drop-privacy">
         Everything stays on your machine.
       </div>
     </div>
     <input type="file" id="file-input" multiple
-      accept=".jpg,.jpeg,.png,.webp,.avif,.gif,.heic,.heif,.heics,.heifs,.tif,.tiff,.bmp,.svg,.psd,image/*" />
+      accept=".jpg,.jpeg,.png,.webp,.avif,.gif,.heic,.heif,.heics,.heifs,.tif,.tiff,.bmp,.svg,.psd,.pdf,application/pdf,image/*" />
   </section>
 
   <!-- Format + Options ------------------------------------------------- -->
@@ -1351,6 +1351,14 @@
           <option value="192" selected>2× (192 dpi)</option>
           <option value="288">3× (288 dpi)</option>
         </select>
+      </div>
+    </div>
+
+    <!-- PDF-specific control: shown only when a PDF file is in the list -->
+    <div id="pdf-page-group" style="display:none; margin-top:14px;">
+      <div class="control-group" style="max-width:280px;">
+        <label class="field-label" for="pdf-page">PDF page to convert</label>
+        <input type="number" id="pdf-page" min="1" value="1" />
       </div>
     </div>
   </section>
@@ -1629,6 +1637,7 @@
   function detectSourceKind(file) {
     const ext = ('.' + (file.name.split('.').pop() || '')).toLowerCase();
     const m = (file.type || '').toLowerCase();
+    if (ext === '.pdf' || m === 'application/pdf') return 'pdf';
     if (ext === '.psd' || m.includes('photoshop')) return 'psd';
     if (['.heic', '.heif', '.heics', '.heifs'].includes(ext) ||
         m.startsWith('image/heic') || m.startsWith('image/heif')) return 'heif';
@@ -1682,6 +1691,8 @@
   const fileCount          = document.getElementById('file-count');
   const svgDensityGroup    = document.getElementById('svg-density-group');
   const svgDensity         = document.getElementById('svg-density');
+  const pdfPageGroup       = document.getElementById('pdf-page-group');
+  const pdfPageInput       = document.getElementById('pdf-page');
 
   // --- Format selector ------------------------------------------------------
   function setTargetFormat(fmt) {
@@ -2031,8 +2042,9 @@
     if (!entry) return;
     const wrap = entry.rowEl.querySelector('.thumb-wrap');
 
-    // Browsers can't render PSD / HEIF natively → show a labelled placeholder.
-    const browserSupportsThumb = !['psd', 'heif', 'tiff', 'bmp'].includes(kind);
+    // Browsers can't render PSD / HEIF / PDF natively in an <img> → show a
+    // labelled placeholder.
+    const browserSupportsThumb = !['psd', 'heif', 'tiff', 'bmp', 'pdf'].includes(kind);
     if (!browserSupportsThumb) {
       const placeholder = document.createElement('div');
       placeholder.className = 'thumb-placeholder';
@@ -2079,6 +2091,9 @@
       }
       if (kind === 'heif') {
         notices.push('HEIF/HEIC input: decoded locally; no HEIC encoder is shipped (use AVIF for similar compression).');
+      }
+      if (kind === 'pdf') {
+        notices.push('PDF input: a single page is rendered (choose it with “PDF page to convert” above).');
       }
       if ((kind === 'gif' || kind === 'webp') && effective.targetFormat !== kind) {
         notices.push('Animated sources are flattened to the first frame in v1.');
@@ -2335,6 +2350,9 @@
     if (entry.kind === 'svg') {
       formData.append('inputDensity', svgDensity.value);
     }
+    if (entry.kind === 'pdf') {
+      formData.append('pdfPage', pdfPageInput.value || '1');
+    }
     // Metadata toggles. Only send when they deviate from defaults so the
     // server keeps its byte-identical no-op default behavior when both are
     // at the stock values. (Privacy toggles stay global in v1.3.)
@@ -2509,6 +2527,10 @@
     // SVG density only visible when an SVG file is in the list.
     const hasSvg = [...files.values()].some((e) => e.kind === 'svg');
     svgDensityGroup.style.display = hasSvg ? '' : 'none';
+
+    // PDF page picker only visible when a PDF file is in the list.
+    const hasPdf = [...files.values()].some((e) => e.kind === 'pdf');
+    pdfPageGroup.style.display = hasPdf ? '' : 'none';
 
     // "Apply to all" only meaningful when there are files to apply to.
     applyToAllBtn.hidden = count === 0;

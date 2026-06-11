@@ -9,6 +9,7 @@ const sharp = require('sharp');
 const path = require('path');
 const fs = require('fs');
 const magick = require('./lib/magick');
+const pdf = require('./lib/pdf');
 
 // Output dir and port are configurable so the same server can run as a
 // standalone process (`npm start`) or be embedded in the Electron app.
@@ -72,6 +73,7 @@ const INPUT_MIMES = new Set([
   'image/vnd.adobe.photoshop', 'application/x-photoshop',
   'application/photoshop', 'application/psd', 'image/x-photoshop',
   'image/jxl',
+  'application/pdf',
   // Note: RAW camera formats (NEF/CR2/DNG/ARW/etc.) were investigated for
   // v1.2 — magick-wasm "accepts" them but only extracts the tiny embedded
   // preview (typically 160×120), not the full demosaiced sensor data. That
@@ -82,7 +84,7 @@ const INPUT_EXTS = new Set([
   '.jpg', '.jpeg', '.png', '.webp', '.avif', '.gif',
   '.heic', '.heif', '.heics', '.heifs',
   '.tif', '.tiff', '.bmp', '.svg', '.psd',
-  '.jxl',
+  '.jxl', '.pdf',
 ]);
 
 // -- Small helpers ------------------------------------------------------------
@@ -101,10 +103,12 @@ function parseHexColor(s) {
 }
 
 // detectSourceKind: which decoder path do we take?
-// Returns one of: jpeg, png, webp, avif, gif, heif, tiff, bmp, svg, psd, jxl, unknown.
+// Returns one of: jpeg, png, webp, avif, gif, heif, tiff, bmp, svg, psd, jxl,
+// pdf, unknown.
 function detectSourceKind(file) {
   const ext = path.extname(file.originalname || '').toLowerCase();
   const mime = (file.mimetype || '').toLowerCase();
+  if (ext === '.pdf' || mime === 'application/pdf') return 'pdf';
   if (ext === '.psd' || mime.includes('photoshop') || mime === 'application/psd') return 'psd';
   if (ext === '.bmp' || mime === 'image/bmp') return 'bmp';
   if (
@@ -135,9 +139,16 @@ const SHARP_NATIVE_SOURCES = new Set([
 // Build a sharp pipeline from the uploaded buffer. SVG keeps its density-
 // aware decode; sharp-native formats pass through unchanged; everything else
 // is decoded by magick-wasm to raw RGBA and re-entered into sharp's pipeline.
-async function buildSourcePipeline(file, sourceKind, { density }) {
+async function buildSourcePipeline(file, sourceKind, { density, pdfPage }) {
   if (sourceKind === 'svg') {
     return sharp(file.buffer, { density });
+  }
+
+  if (sourceKind === 'pdf') {
+    // mupdf rasterises one page (1-based, clamped to the document) at the
+    // same density used for SVG input, then re-enters the sharp pipeline.
+    const { png } = await pdf.renderPageToPng(file.buffer, { page: pdfPage, density });
+    return sharp(png);
   }
 
   if (SHARP_NATIVE_SOURCES.has(sourceKind)) {
@@ -636,6 +647,10 @@ function createApp() {
     }
 
     const density = clamp(req.body.inputDensity, 72, 1440, 192);
+    // PDF page selection (1-based). Out-of-range values are clamped to the
+    // document's page count inside lib/pdf.js, so a high upper bound here
+    // just guards against absurd input.
+    const pdfPage = clamp(req.body.pdfPage, 1, 100000, 1);
     const sourceKind = detectSourceKind(req.file);
 
     const originalStem = path.parse(req.file.originalname).name;
@@ -643,7 +658,7 @@ function createApp() {
     const outputPath = resolveOutputPath(outputFilename);
 
     try {
-      let pipeline = await buildSourcePipeline(req.file, sourceKind, { density });
+      let pipeline = await buildSourcePipeline(req.file, sourceKind, { density, pdfPage });
       pipeline = await applyTransforms(pipeline, transforms);
       const outputBuffer = await encoder.encode(pipeline, opts, { sourceKind });
       fs.writeFileSync(outputPath, outputBuffer);

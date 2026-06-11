@@ -5,6 +5,15 @@ All notable changes to LocalPix will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project loosely follows [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Added
+
+- **PDF input.** Drop a PDF and convert any page of it to any output
+  format. Pages are rendered fully offline by MuPDF (WASM) at 192 dpi;
+  a "PDF page to convert" field appears whenever a PDF is in the list
+  (out-of-range page numbers clamp to the document's last page).
+
 ## [1.3.0] — 2026-06-10
 
 ### Added
