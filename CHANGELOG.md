@@ -11,27 +11,32 @@ and this project loosely follows [Semantic Versioning](https://semver.org/).
 
 - **PDF input.** Drop a PDF and convert any page of it to any output
   format. Pages are rendered fully offline by MuPDF (WASM) at 192 dpi;
-  a "PDF page to convert" field appears whenever a PDF is in the list
-  (out-of-range page numbers clamp to the document's last page).
+  a "PDF page to convert" field appears whenever a PDF is in the list,
+  capped at the document's real page count, with a **Convert all pages**
+  checkbox that converts every page (outputs named `name-p1`, `name-p2`,
+  … with per-page download links).
 - **Output filename templates.** A "Filename" field next to the output
   folder accepts tokens — `{name}` `{format}` `{width}` `{height}`
   `{date}` `{n}` — applied when naming converted files. `{n}` finds the
   first free number in the output folder, so batches count 1, 2, 3….
   Leaving the field empty (or `{name}`) keeps the original naming, and
   the timestamp suffix still prevents collisions. The template persists
-  between sessions.
+  between sessions, and the tokens are clickable chips that insert at
+  the caret.
 
 - **Settings presets.** Save the current global settings (format +
   options + transforms) under a name and recall them from a dropdown
   next to the Convert-to header; Delete removes the selected preset.
   Presets persist in the desktop app's config file (next to the output
   folder choice) and in localStorage in web mode.
-- **Manual crop.** A "Crop…" button in the per-file drawer opens a
-  drag-to-crop editor: draw, move, and resize a selection with corner and
-  edge handles, lock the aspect ratio (1:1, 4:3, 3:2, 16:9), and read the
-  live size in source pixels. The crop is stored in original source
-  coordinates and applied before rotation/resize, so what you draw is
-  exactly the region kept. Works with mouse and touch.
+- **Manual crop.** An "Open crop overlay…" button in the per-file drawer
+  opens a drag-to-crop editor: draw, move, and resize a selection with
+  corner and edge handles, lock the aspect ratio (landscape and portrait:
+  1:1, 4:3, 3:4, 3:2, 2:3, 16:9, 9:16), and read the live size in source
+  pixels. The crop is stored in original source coordinates and applied
+  before rotation/resize, so what you draw is exactly the region kept.
+  Works with mouse and touch. The aspect-crop controls stay enabled while
+  a manual region is set — picking an aspect ratio replaces the region.
 - **Per-file transforms editing.** The per-file settings drawer now hosts
   a fully editable Transforms panel (resize, rotate, flip, crop, kernel)
   bound to that file's override — previously transforms were snapshotted

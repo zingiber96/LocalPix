@@ -1143,6 +1143,23 @@
     .preset-bar select { font-size: 11.5px; padding: 4px 8px; }
     #preset-delete:hover { color: var(--danger); }
 
+    /* Clickable filename-template token chips */
+    .token-chip {
+      font-family: var(--font-mono);
+      font-size: 10.5px;
+      background: var(--surface-2);
+      border: 1px solid var(--border);
+      border-radius: 3px;
+      padding: 1px 6px;
+      color: var(--text);
+      cursor: pointer;
+      transition: border-color 0.12s, color 0.12s;
+    }
+    .token-chip:hover {
+      border-color: var(--accent);
+      color: var(--accent);
+    }
+
     /* --- Per-file override UI --------------------------------------------- */
 
     /* Customize toggle button: accent hover instead of danger */
@@ -1479,8 +1496,12 @@
     <!-- PDF-specific control: shown only when a PDF file is in the list -->
     <div id="pdf-page-group" style="display:none; margin-top:14px;">
       <div class="control-group" style="max-width:280px;">
-        <label class="field-label" for="pdf-page">PDF page to convert</label>
+        <label class="field-label" for="pdf-page">PDF page to convert<span id="pdf-page-count"></span></label>
         <input type="number" id="pdf-page" min="1" value="1" />
+        <div class="checkbox-row no-pad" style="margin-top:8px;">
+          <input type="checkbox" id="pdf-all-pages" />
+          <label for="pdf-all-pages">Convert all pages</label>
+        </div>
       </div>
     </div>
   </section>
@@ -1542,7 +1563,14 @@
         aria-describedby="filename-template-hint" />
     </div>
     <div id="filename-template-hint" style="font-size:11px; color:var(--text-faint); margin-top:6px;">
-      Tokens: <code>{name}</code> <code>{format}</code> <code>{width}</code> <code>{height}</code> <code>{date}</code> <code>{n}</code> — leave empty for the original name
+      Click to insert:
+      <button type="button" class="token-chip" data-token="{name}">{name}</button>
+      <button type="button" class="token-chip" data-token="{format}">{format}</button>
+      <button type="button" class="token-chip" data-token="{width}">{width}</button>
+      <button type="button" class="token-chip" data-token="{height}">{height}</button>
+      <button type="button" class="token-chip" data-token="{date}">{date}</button>
+      <button type="button" class="token-chip" data-token="{n}">{n}</button>
+      — leave empty for the original name
     </div>
   </section>
 
@@ -1740,6 +1768,46 @@
   const svgDensity         = document.getElementById('svg-density');
   const pdfPageGroup       = document.getElementById('pdf-page-group');
   const pdfPageInput       = document.getElementById('pdf-page');
+  const pdfPageCountEl     = document.getElementById('pdf-page-count');
+  const pdfAllPages        = document.getElementById('pdf-all-pages');
+
+  // Probe a PDF's page count via /api/pdf-info so the page picker can be
+  // capped and "Convert all pages" knows how far to iterate. Non-fatal on
+  // failure — the server clamps out-of-range pages anyway.
+  async function probePdfInfo(id) {
+    const entry = files.get(id);
+    if (!entry || entry.kind !== 'pdf') return;
+    try {
+      const fd = new FormData();
+      fd.append('image', entry.file);
+      const resp = await fetch('/api/pdf-info', { method: 'POST', body: fd });
+      const data = await resp.json();
+      if (resp.ok && data.pageCount > 0) {
+        entry.pdfPages = data.pageCount;
+        refreshPdfControls();
+        refreshFileNotices();
+      }
+    } catch (e) { /* probe is best-effort */ }
+  }
+
+  // Cap the page input at the largest known page count and reflect the
+  // "all pages" checkbox state. Called from refresh() and probePdfInfo().
+  function refreshPdfControls() {
+    let maxPages = 0;
+    for (const e of files.values()) {
+      if (e.kind === 'pdf' && e.pdfPages) maxPages = Math.max(maxPages, e.pdfPages);
+    }
+    if (maxPages > 0) {
+      pdfPageInput.max = String(maxPages);
+      if (Number(pdfPageInput.value) > maxPages) pdfPageInput.value = String(maxPages);
+      pdfPageCountEl.textContent = ` (of ${maxPages})`;
+    } else {
+      pdfPageInput.removeAttribute('max');
+      pdfPageCountEl.textContent = '';
+    }
+    pdfPageInput.disabled = pdfAllPages.checked;
+  }
+  pdfAllPages.addEventListener('change', refreshPdfControls);
   const filenameTemplateInput = document.getElementById('filename-template');
 
   // Persist the filename template across sessions (web localStorage; the
@@ -1754,6 +1822,22 @@
       if (v) localStorage.setItem('localpix-filename-template', v);
       else localStorage.removeItem('localpix-filename-template');
     } catch (e) { /* private mode etc. */ }
+  });
+
+  // Token chips insert at the caret (replacing any selection) and re-focus
+  // the field so several tokens can be clicked in a row.
+  document.querySelectorAll('#filename-template-hint .token-chip').forEach((chip) => {
+    chip.addEventListener('click', () => {
+      const token = chip.dataset.token;
+      const input = filenameTemplateInput;
+      const start = input.selectionStart ?? input.value.length;
+      const end = input.selectionEnd ?? start;
+      input.value = input.value.slice(0, start) + token + input.value.slice(end);
+      const caret = start + token.length;
+      input.focus();
+      input.setSelectionRange(caret, caret);
+      input.dispatchEvent(new Event('input')); // persist via the handler above
+    });
   });
 
   // --- Format selector ------------------------------------------------------
@@ -2039,6 +2123,7 @@
       files.set(id, { file, kind, rowEl, state: 'pending', naturalW: 0, naturalH: 0, override: null });
       fileList.appendChild(rowEl);
       generateThumb(id, file, kind);
+      if (kind === 'pdf') probePdfInfo(id);
     }
     refresh();
   }
@@ -2403,6 +2488,67 @@
     if (!drawer.hidden) buildDrawerContent(id, entry, drawer);
   }
 
+  // Assemble the multipart payload for one /api/convert request. Optional
+  // overrides let the PDF "all pages" loop pin the page number and append a
+  // per-page suffix to the filename template.
+  function buildConvertFormData(entry, settings, { pdfPage, filenameTemplate } = {}) {
+    const formData = new FormData();
+    formData.append('image', entry.file);
+    formData.append('targetFormat', settings.targetFormat);
+    formData.append('options', JSON.stringify(settings.opts));
+    if (entry.kind === 'svg') {
+      formData.append('inputDensity', svgDensity.value);
+    }
+    if (entry.kind === 'pdf') {
+      formData.append('pdfPage', String(pdfPage ?? (pdfPageInput.value || '1')));
+    }
+    // Output filename template. Only sent when it deviates from the default
+    // so untouched conversions keep the minimal, byte-identical request shape.
+    const fnTemplate = filenameTemplate !== undefined
+      ? filenameTemplate
+      : filenameTemplateInput.value.trim();
+    if (fnTemplate && fnTemplate !== '{name}') {
+      formData.append('filenameTemplate', fnTemplate);
+    }
+    // Metadata toggles. Only send when they deviate from defaults so the
+    // server keeps its byte-identical no-op default behavior when both are
+    // at the stock values. (Privacy toggles stay global.)
+    const stripEl = document.getElementById('strip-metadata');
+    const preserveEl = document.getElementById('preserve-color-profile');
+    if (stripEl && !stripEl.checked) formData.append('stripMetadata', 'false');
+    if (preserveEl && preserveEl.checked) formData.append('preserveColorProfile', 'true');
+
+    // Cross-cutting transforms (resize, rotate, flip, crop, kernel) from the
+    // resolved settings — per-file override or global default.
+    if (settings.transformsPayload) {
+      formData.append('transforms', JSON.stringify(settings.transformsPayload));
+    }
+    return formData;
+  }
+
+  async function postConvert(formData) {
+    const resp = await fetch('/api/convert', { method: 'POST', body: formData });
+    const data = await resp.json();
+    if (!resp.ok) throw new Error(data.error || 'Conversion failed');
+    return data;
+  }
+
+  function downloadLinkFor(data, label) {
+    const downloadIcon = svgEl('svg',
+      { viewBox: '0 0 16 16', fill: 'none', stroke: 'currentColor',
+        'stroke-width': 1.8, 'stroke-linecap': 'round', 'stroke-linejoin': 'round' },
+      svgEl('path', { d: 'M8 2v9M4 7l4 4 4-4M3 13h10' }),
+    );
+    return el('a',
+      { class: 'download-link',
+        href: '/api/download/' + encodeURIComponent(data.convertedName),
+        download: data.convertedName,
+        title: data.convertedName },
+      downloadIcon,
+      ' ' + label,
+    );
+  }
+
   async function convertFile(id) {
     const entry = files.get(id);
     if (!entry || entry.state === 'converting') return;
@@ -2416,80 +2562,69 @@
 
     const settings = getEffectiveSettings(entry);
 
-    const formData = new FormData();
-    formData.append('image', entry.file);
-    formData.append('targetFormat', settings.targetFormat);
-    formData.append('options', JSON.stringify(settings.opts));
-    if (entry.kind === 'svg') {
-      formData.append('inputDensity', svgDensity.value);
-    }
-    if (entry.kind === 'pdf') {
-      formData.append('pdfPage', pdfPageInput.value || '1');
-    }
-    // Output filename template. Only sent when it deviates from the default
-    // so untouched conversions keep the minimal, byte-identical request shape.
-    const fnTemplate = filenameTemplateInput.value.trim();
-    if (fnTemplate && fnTemplate !== '{name}') {
-      formData.append('filenameTemplate', fnTemplate);
-    }
-    // Metadata toggles. Only send when they deviate from defaults so the
-    // server keeps its byte-identical no-op default behavior when both are
-    // at the stock values. (Privacy toggles stay global in v1.3.)
-    const stripEl = document.getElementById('strip-metadata');
-    const preserveEl = document.getElementById('preserve-color-profile');
-    if (stripEl && !stripEl.checked) formData.append('stripMetadata', 'false');
-    if (preserveEl && preserveEl.checked) formData.append('preserveColorProfile', 'true');
-
-    // Cross-cutting transforms (resize, rotate, flip, crop, kernel) from the
-    // resolved settings — per-file override or global default.
-    if (settings.transformsPayload) {
-      formData.append('transforms', JSON.stringify(settings.transformsPayload));
-    }
-
     try {
-      const resp = await fetch('/api/convert', { method: 'POST', body: formData });
-      const data = await resp.json();
-      if (!resp.ok) throw new Error(data.error || 'Conversion failed');
+      // "Convert all pages" for PDFs: one request per page. The filename
+      // template (or its {name} default) gets a -p<N> suffix per page so
+      // the outputs sort together instead of colliding into timestamps.
+      const allPages = entry.kind === 'pdf' && pdfAllPages.checked && (entry.pdfPages || 0) > 1;
+      let results;
+      if (allPages) {
+        const userTpl = filenameTemplateInput.value.trim() || '{name}';
+        results = [];
+        for (let pageN = 1; pageN <= entry.pdfPages; pageN++) {
+          results.push(await postConvert(buildConvertFormData(entry, settings, {
+            pdfPage: pageN,
+            filenameTemplate: `${userTpl}-p${pageN}`,
+          })));
+        }
+      } else {
+        results = [await postConvert(buildConvertFormData(entry, settings))];
+      }
 
       entry.state = 'done';
-      entry.convertedName = data.convertedName;
-      entry.convertedSize = data.convertedSize;
+      entry.convertedName = results[0].convertedName;
+      const totalSize = results.reduce((s, d) => s + d.convertedSize, 0);
+      entry.convertedSize = totalSize;
       row.className = 'file-row done';
 
-      const savings = data.originalSize - data.convertedSize;
-      const pct = data.originalSize > 0
-        ? Math.round((savings / data.originalSize) * 100)
-        : 0;
-      const savingsNode = savings > 0
-        ? el('span', { class: 'savings', text: '↓ ' + pct + '% saved' })
-        : el('span',
-            { style: { color: 'var(--text-muted)' },
-              text: pct === 0 ? 'same size' : '↑ larger' });
+      if (results.length > 1) {
+        row.querySelector('.result-info').replaceChildren(
+          el('span', { class: 'arrow', text: '→' }),
+          ` ${results.length} pages `,
+          el('span', { class: 'sep', text: '·' }),
+          ' ' + formatSize(totalSize),
+        );
+        row.querySelector('.download-wrap').replaceChildren(
+          ...results.map((d, i) => downloadLinkFor(d, 'p' + (i + 1))),
+        );
+        row.querySelector('.download-wrap').style.display = 'inline-flex';
+        row.querySelector('.download-wrap').style.flexWrap = 'wrap';
+        row.querySelector('.download-wrap').style.gap = '4px';
+      } else {
+        const data = results[0];
+        const savings = data.originalSize - data.convertedSize;
+        const pct = data.originalSize > 0
+          ? Math.round((savings / data.originalSize) * 100)
+          : 0;
+        const savingsNode = savings > 0
+          ? el('span', { class: 'savings', text: '↓ ' + pct + '% saved' })
+          : el('span',
+              { style: { color: 'var(--text-muted)' },
+                text: pct === 0 ? 'same size' : '↑ larger' });
 
-      row.querySelector('.result-info').replaceChildren(
-        el('span', { class: 'arrow', text: '→' }),
-        ' ',
-        formatSize(data.convertedSize),
-        ' ',
-        el('span', { class: 'sep', text: '·' }),
-        ' ',
-        savingsNode,
-      );
-
-      const downloadIcon = svgEl('svg',
-        { viewBox: '0 0 16 16', fill: 'none', stroke: 'currentColor',
-          'stroke-width': 1.8, 'stroke-linecap': 'round', 'stroke-linejoin': 'round' },
-        svgEl('path', { d: 'M8 2v9M4 7l4 4 4-4M3 13h10' }),
-      );
-      row.querySelector('.download-wrap').replaceChildren(
-        el('a',
-          { class: 'download-link',
-            href: '/api/download/' + encodeURIComponent(data.convertedName),
-            download: data.convertedName },
-          downloadIcon,
-          ' Save',
-        ),
-      );
+        row.querySelector('.result-info').replaceChildren(
+          el('span', { class: 'arrow', text: '→' }),
+          ' ',
+          formatSize(data.convertedSize),
+          ' ',
+          el('span', { class: 'sep', text: '·' }),
+          ' ',
+          savingsNode,
+        );
+        row.querySelector('.download-wrap').replaceChildren(
+          downloadLinkFor(data, 'Save'),
+        );
+      }
 
       convertBtn.textContent = 'Reconvert';
       convertBtn.disabled = false;
@@ -2610,6 +2745,7 @@
     // PDF page picker only visible when a PDF file is in the list.
     const hasPdf = [...files.values()].some((e) => e.kind === 'pdf');
     pdfPageGroup.style.display = hasPdf ? '' : 'none';
+    if (hasPdf) refreshPdfControls();
 
     // "Apply to all" only meaningful when there are files to apply to.
     applyToAllBtn.hidden = count === 0;
@@ -2761,6 +2897,45 @@
     syncPreserveEnabled();
   })();
 
+  // Minimal text-input dialog. Electron's renderer does NOT implement
+  // window.prompt() (Chromium drops it there), so preset naming uses this
+  // DOM-built modal instead. Resolves with the entered string, or null on
+  // cancel/Escape/backdrop click.
+  function promptForText({ title, initial = '', confirmLabel = 'Save' }) {
+    return new Promise((resolve) => {
+      const input = el('input', { type: 'text', value: initial, spellcheck: 'false' });
+      const okBtn = el('button', { type: 'button', class: 'btn btn-primary btn-sm', text: confirmLabel });
+      const cancelBtn = el('button', { type: 'button', class: 'btn btn-ghost btn-sm', text: 'Cancel' });
+      const modal = el('div',
+        { class: 'crop-modal', role: 'dialog', 'aria-label': title, style: { minWidth: '280px' } },
+        el('label', { class: 'field-label', text: title }),
+        input,
+        el('div', { class: 'crop-modal-footer' }, cancelBtn, okBtn),
+      );
+      const backdrop = el('div', { class: 'crop-backdrop' }, modal);
+
+      function done(value) {
+        document.removeEventListener('keydown', onKey);
+        backdrop.remove();
+        resolve(value);
+      }
+      function onKey(e) {
+        if (e.key === 'Escape') done(null);
+        else if (e.key === 'Enter' && document.activeElement === input) done(input.value);
+      }
+      document.addEventListener('keydown', onKey);
+      okBtn.addEventListener('click', () => done(input.value));
+      cancelBtn.addEventListener('click', () => done(null));
+      backdrop.addEventListener('pointerdown', (e) => {
+        if (e.target === backdrop) done(null);
+      });
+
+      document.body.appendChild(backdrop);
+      input.focus();
+      input.select();
+    });
+  }
+
   // -- Settings presets -------------------------------------------------------
   // Named snapshots of the global settings (target + opts + transforms) —
   // the same shape per-file overrides use (snapshotGlobalSettings()).
@@ -2819,7 +2994,9 @@
     });
 
     saveBtn.addEventListener('click', async () => {
-      const name = (window.prompt('Preset name:', sel.value || '') || '').trim();
+      // window.prompt doesn't exist in Electron — use the in-app dialog.
+      const raw = await promptForText({ title: 'Preset name', initial: sel.value || '' });
+      const name = (raw || '').trim();
       if (!name) return;
       if (presets[name] && !window.confirm(`Replace existing preset "${name}"?`)) return;
       presets[name] = snapshotGlobalSettings();
@@ -3009,8 +3186,10 @@
     const readout = el('span', { class: 'crop-readout', text: '' });
     const aspectSel = el('select', { 'aria-label': 'Aspect lock' });
     for (const [value, label] of [
-      ['free', 'Free'], ['1:1', '1:1'], ['4:3', '4:3'],
-      ['3:2', '3:2'], ['16:9', '16:9'],
+      ['free', 'Free'], ['1:1', '1:1'],
+      ['4:3', '4:3 (landscape)'], ['3:4', '3:4 (portrait)'],
+      ['3:2', '3:2 (landscape)'], ['2:3', '2:3 (portrait)'],
+      ['16:9', '16:9 (landscape)'], ['9:16', '9:16 (portrait)'],
     ]) {
       aspectSel.appendChild(el('option', { value, text: label }));
     }
@@ -3341,7 +3520,12 @@
 
     // -- Crop row
     const cropSel = el('select', {
-      onchange: () => { state.crop.aspect = cropSel.value; changed(); },
+      onchange: () => {
+        state.crop.aspect = cropSel.value;
+        // Choosing an aspect ratio replaces any manual pixel box.
+        if (state.crop.box) state.crop.box = null;
+        changed();
+      },
     });
     for (const [value, label] of [
       ['none', 'None'], ['1:1', '1:1 (square)'], ['4:3', '4:3'],
@@ -3396,11 +3580,14 @@
       upscaleRow.hidden = !(state.resize.mode === 'max' || state.resize.mode === 'percentage');
       kernelSel.disabled = state.resize.mode === 'none';
       const box = state.crop.box && state.crop.box.width > 0 ? state.crop.box : null;
-      // A manual pixel box supersedes the aspect crop.
-      cropSel.disabled = !!box;
-      cropCustomBox.hidden = !!box || state.crop.aspect !== 'custom';
+      // Manual box and aspect crop are mutually exclusive, but the aspect
+      // controls stay enabled — picking an aspect clears the box (see the
+      // cropSel handler) rather than greying out and looking dead. The
+      // select mirrors state because applying a box resets aspect to none.
+      cropSel.value = state.crop.aspect;
+      cropCustomBox.hidden = state.crop.aspect !== 'custom';
       if (cropBtn) {
-        cropBtn.textContent = box ? 'Edit crop…' : 'Crop…';
+        cropBtn.textContent = box ? 'Edit crop region…' : 'Open crop overlay…';
         cropBoxReadout.textContent = box
           ? `${box.width}×${box.height}px @ (${box.left}, ${box.top})` : '';
         cropClearBtn.hidden = !box;

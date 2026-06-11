@@ -693,6 +693,23 @@ function createApp() {
     });
   });
 
+  // Lightweight PDF probe — returns the page count so the frontend can cap
+  // its page picker and iterate "All pages" conversions client-side.
+  app.post('/api/pdf-info', convertLimiter, upload.single('image'), async (req, res) => {
+    if (!req.file) {
+      return res.status(400).json({ error: 'No file uploaded.' });
+    }
+    if (detectSourceKind(req.file) !== 'pdf') {
+      return res.status(400).json({ error: 'Not a PDF.' });
+    }
+    try {
+      const pageCount = await pdf.countPages(req.file.buffer);
+      res.json({ pageCount });
+    } catch (err) {
+      res.status(500).json({ error: `Could not read PDF: ${err.message}` });
+    }
+  });
+
   app.post('/api/convert', convertLimiter, upload.single('image'), async (req, res) => {
     if (!req.file) {
       return res.status(400).json({ error: 'No file uploaded.' });
