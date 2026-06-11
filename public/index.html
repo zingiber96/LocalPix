@@ -1315,6 +1315,11 @@
       user-select: none;
       line-height: 0;
       cursor: crosshair;
+      /* Clip the crop-rect's dimming shade to the image area — without this
+         the 9999px box-shadow spills over the whole modal and greys out the
+         toolbar/footer too. */
+      overflow: hidden;
+      border-radius: 4px;
     }
     .crop-stage img {
       max-width: min(760px, calc(100vw - 90px));
