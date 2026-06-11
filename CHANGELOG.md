@@ -21,6 +21,17 @@ and this project loosely follows [Semantic Versioning](https://semver.org/).
   the timestamp suffix still prevents collisions. The template persists
   between sessions.
 
+- **Per-file transforms editing.** The per-file settings drawer now hosts
+  a fully editable Transforms panel (resize, rotate, flip, crop, kernel)
+  bound to that file's override — previously transforms were snapshotted
+  but read-only. The dimension preview inside the drawer is pinned to that
+  file's own dimensions. Global and per-file panels share one renderer.
+
+### Fixed
+
+- Hidden buttons (e.g. the Transforms "Reset") could stay visible because
+  the `.btn` display rule overrode the `hidden` attribute.
+
 ## [1.3.0] — 2026-06-10
 
 ### Added

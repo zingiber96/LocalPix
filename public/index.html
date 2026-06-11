@@ -706,8 +706,8 @@
       width: 64px;
     }
 
-    #resample-kernel { width: auto; min-width: 220px; }
-    #resample-kernel:disabled { opacity: 0.6; }
+    .transforms-kernel { width: auto; min-width: 220px; }
+    .transforms-kernel:disabled { opacity: 0.6; }
 
     /* --- Output folder row --------------------------------------------- */
 
@@ -759,6 +759,10 @@
       white-space: nowrap;
       font-family: inherit;
     }
+
+    /* Author display rules beat the UA's [hidden] { display:none } — restate
+       it so JS-toggled `hidden` works on buttons. */
+    .btn[hidden] { display: none; }
 
     .btn:active:not(:disabled) { transform: translateY(0.5px); }
     .btn:disabled { opacity: 0.45; cursor: not-allowed; }
@@ -1399,94 +1403,10 @@
       <button class="btn btn-ghost btn-sm" id="transforms-reset" type="button" hidden>Reset</button>
     </div>
 
-    <div class="transforms-body" id="transforms-body" hidden>
-
-      <!-- Resize -->
-      <div class="transforms-row">
-        <div class="field-label">Resize</div>
-        <div class="transforms-segmented" id="resize-mode-buttons" role="radiogroup" aria-label="Resize mode">
-          <button class="transforms-seg-btn active" data-mode="none" type="button" role="radio" aria-checked="true">None</button>
-          <button class="transforms-seg-btn" data-mode="max" type="button" role="radio">Max dim</button>
-          <button class="transforms-seg-btn" data-mode="percentage" type="button" role="radio">Percentage</button>
-          <button class="transforms-seg-btn" data-mode="exact" type="button" role="radio">Exact</button>
-        </div>
-        <div class="resize-inputs" id="resize-inputs-max" hidden>
-          <input type="number" id="resize-max-w" min="1" placeholder="W" />
-          <span class="resize-sep">×</span>
-          <input type="number" id="resize-max-h" min="1" placeholder="H" />
-          <span class="resize-unit">px (bound the long edge)</span>
-        </div>
-        <div class="resize-inputs" id="resize-inputs-percentage" hidden>
-          <input type="number" id="resize-pct" min="1" max="1000" value="100" />
-          <span class="resize-unit">%</span>
-        </div>
-        <div class="resize-inputs" id="resize-inputs-exact" hidden>
-          <input type="number" id="resize-exact-w" min="1" placeholder="W" />
-          <span class="resize-sep">×</span>
-          <input type="number" id="resize-exact-h" min="1" placeholder="H" />
-          <span class="resize-unit">px (will crop to match)</span>
-        </div>
-        <div class="checkbox-row no-pad resize-upscale-row" id="resize-upscale-row" hidden>
-          <input type="checkbox" id="resize-upscale" />
-          <label for="resize-upscale">Allow upscale (default off)</label>
-        </div>
-        <div class="resize-preview" id="resize-preview" hidden></div>
-      </div>
-
-      <!-- Rotate / flip -->
-      <div class="transforms-row">
-        <div class="field-label">Rotate &amp; flip</div>
-        <div class="transforms-segmented" id="rotate-buttons" role="radiogroup" aria-label="Rotation">
-          <button class="transforms-seg-btn active" data-rotate="0" type="button" role="radio" aria-checked="true">0°</button>
-          <button class="transforms-seg-btn" data-rotate="90" type="button" role="radio">90°</button>
-          <button class="transforms-seg-btn" data-rotate="180" type="button" role="radio">180°</button>
-          <button class="transforms-seg-btn" data-rotate="270" type="button" role="radio">270°</button>
-        </div>
-        <div class="flip-row">
-          <div class="checkbox-row no-pad">
-            <input type="checkbox" id="flip-horizontal" />
-            <label for="flip-horizontal">Flip horizontal</label>
-          </div>
-          <div class="checkbox-row no-pad">
-            <input type="checkbox" id="flip-vertical" />
-            <label for="flip-vertical">Flip vertical</label>
-          </div>
-        </div>
-      </div>
-
-      <!-- Crop -->
-      <div class="transforms-row">
-        <div class="field-label">Crop to aspect</div>
-        <div class="transforms-aspect-row">
-          <select id="crop-aspect">
-            <option value="none" selected>None</option>
-            <option value="1:1">1:1 (square)</option>
-            <option value="4:3">4:3</option>
-            <option value="3:2">3:2</option>
-            <option value="16:9">16:9</option>
-            <option value="custom">Custom…</option>
-          </select>
-          <div class="crop-custom-inputs" id="crop-custom-inputs" hidden>
-            <input type="number" id="crop-custom-w" min="1" placeholder="W" />
-            <span class="resize-sep">:</span>
-            <input type="number" id="crop-custom-h" min="1" placeholder="H" />
-          </div>
-        </div>
-      </div>
-
-      <!-- Resample kernel -->
-      <div class="transforms-row">
-        <div class="field-label">Resample kernel</div>
-        <select id="resample-kernel" disabled>
-          <option value="lanczos3" selected>Lanczos 3 (default)</option>
-          <option value="lanczos2">Lanczos 2</option>
-          <option value="mitchell">Mitchell</option>
-          <option value="cubic">Cubic</option>
-          <option value="nearest">Nearest (sharp pixels)</option>
-        </select>
-      </div>
-
-    </div>
+    <!-- Body is built by buildTransformsPanel() against the global
+         transformsState; the per-file drawer builds the same panel against
+         a file's override.transforms. -->
+    <div class="transforms-body" id="transforms-body" hidden></div>
   </section>
 
   <!-- Output folder ---------------------------------------------------- -->
@@ -2299,8 +2219,17 @@
     // Initial options render
     rebuildOpts();
 
-    // -- Transforms snapshot (read-only — per-file transforms editing in Phase 5)
-    const txDesc = describeActiveTransforms(override.transforms);
+    // -- Transforms: fully editable, bound to this file's override snapshot.
+    // Same renderer as the global section; preview pins to this file's dims.
+    const txPanel = el('div', { class: 'transforms-body' });
+    txPanel.hidden = false;
+    buildTransformsPanel(txPanel, override.transforms, {
+      onChange: () => {
+        refreshBadge();
+        refreshFileNotices();
+      },
+      previewEntry: entry,
+    });
 
     // -- Assemble
     drawer.appendChild(el('div', { class: 'file-drawer-section' },
@@ -2311,10 +2240,10 @@
       el('div', { class: 'file-drawer-label', text: 'Options' }),
       optsPanel,
     ));
-    if (txDesc) {
-      drawer.appendChild(el('div', { class: 'override-tx-summary',
-        text: 'Transforms at capture: ' + txDesc }));
-    }
+    drawer.appendChild(el('div', { class: 'file-drawer-section' },
+      el('div', { class: 'file-drawer-label', text: 'Transforms' }),
+      txPanel,
+    ));
   }
 
   // Update the override status bar and row chrome to reflect whether the file
@@ -2758,8 +2687,9 @@
   }
 
   // Count how many transform categories are non-default. Drives the badge.
-  function countActiveTransforms() {
-    const s = transformsState;
+  // Accepts an optional state object; defaults to the global transformsState.
+  function countActiveTransforms(state) {
+    const s = state || transformsState;
     let n = 0;
     if (s.resize.mode !== 'none') n++;
     if (s.rotate !== 0) n++;
@@ -2768,24 +2698,28 @@
     return n;
   }
 
-  // Compute the resulting dimensions for the first file in the list, applying
-  // the same ordered transforms the server does. Returns a string like
-  // "320×240" or null when no preview is meaningful.
-  function computeResizePreview() {
-    if (transformsState.resize.mode === 'none') return null;
-    const first = [...files.values()].find((e) => e.naturalW && e.naturalH);
-    if (!first) return null;
+  // Compute the resulting dimensions after the ordered transforms the server
+  // applies. Previews from `entry` when given (per-file drawer), otherwise
+  // from the first file in the list with known dimensions (global panel).
+  // Returns a string like "320×240" or null when no preview is meaningful.
+  function computeResizePreview(state, entry) {
+    const s = state || transformsState;
+    if (s.resize.mode === 'none') return null;
+    const src = entry && entry.naturalW && entry.naturalH
+      ? entry
+      : [...files.values()].find((e) => e.naturalW && e.naturalH);
+    if (!src) return null;
 
-    let w = first.naturalW, h = first.naturalH;
+    let w = src.naturalW, h = src.naturalH;
 
     // Rotate
-    if (transformsState.rotate === 90 || transformsState.rotate === 270) {
+    if (s.rotate === 90 || s.rotate === 270) {
       [w, h] = [h, w];
     }
 
     // Crop
-    if (transformsState.crop.aspect !== 'none') {
-      const ratio = parseCropAspect(transformsState.crop);
+    if (s.crop.aspect !== 'none') {
+      const ratio = parseCropAspect(s.crop);
       if (ratio) {
         const srcAspect = w / h;
         const targetAspect = ratio[0] / ratio[1];
@@ -2797,7 +2731,7 @@
     }
 
     // Resize
-    const r = transformsState.resize;
+    const r = s.resize;
     if (r.mode === 'max') {
       const maxW = r.width || Infinity;
       const maxH = r.height || Infinity;
@@ -2832,32 +2766,204 @@
     }
   }
 
+  // Build the full transforms control set (resize, rotate/flip, crop, kernel)
+  // into `container`, bound to an arbitrary transformsState-shaped object.
+  // The generalization mirrors buildOptionsPanel/renderField: the global
+  // section renders against transformsState; the per-file drawer renders the
+  // same panel against entry.override.transforms.
+  //
+  // Controls mutate `state` directly. Visibility that depends on state (which
+  // resize inputs show, custom-crop inputs, kernel enablement) is handled by
+  // a closure-local sync() — no full re-render on input, so number fields
+  // keep focus while typing. `onChange()` fires after every mutation;
+  // `previewEntry` pins the dimension preview to one file (drawer) instead of
+  // the first file in the list (global).
+  //
+  // Returns { sync } so the host can refresh the panel's derived bits
+  // (preview text) when external state changes — e.g. files added.
+  function buildTransformsPanel(container, state, { onChange = () => {}, previewEntry = null } = {}) {
+    container.replaceChildren();
+
+    function changed() {
+      sync();
+      onChange();
+    }
+
+    // -- Segmented radio-row helper
+    function segmentedRow(ariaLabel, items, isActive, onPick) {
+      const row = el('div', { class: 'transforms-segmented', role: 'radiogroup', 'aria-label': ariaLabel });
+      const btns = items.map(({ label, value }) => {
+        const b = el('button', {
+          type: 'button', class: 'transforms-seg-btn', role: 'radio',
+          text: label,
+          onclick: () => { onPick(value); syncActive(); changed(); },
+        });
+        b._value = value;
+        return b;
+      });
+      function syncActive() {
+        for (const b of btns) {
+          const active = isActive(b._value);
+          b.classList.toggle('active', active);
+          b.setAttribute('aria-checked', String(active));
+        }
+      }
+      syncActive();
+      row.append(...btns);
+      row._syncActive = syncActive;
+      return row;
+    }
+
+    function checkboxRow(label, getChecked, onToggle) {
+      const cbId = 'tx-cb-' + (++fieldIdCounter);
+      const cb = el('input', {
+        type: 'checkbox', id: cbId, checked: getChecked(),
+        onchange: () => { onToggle(cb.checked); changed(); },
+      });
+      const row = el('div', { class: 'checkbox-row no-pad' },
+        cb, el('label', { for: cbId, text: label }));
+      row._cb = cb;
+      return row;
+    }
+
+    function numInput(attrs, getValue, onInput) {
+      const input = el('input', {
+        type: 'number', ...attrs,
+        oninput: () => { onInput(Number(input.value) || 0); changed(); },
+      });
+      const v = getValue();
+      if (v) input.value = v;
+      return input;
+    }
+
+    // -- Resize row
+    const resizeSeg = segmentedRow('Resize mode', [
+      { label: 'None', value: 'none' },
+      { label: 'Max dim', value: 'max' },
+      { label: 'Percentage', value: 'percentage' },
+      { label: 'Exact', value: 'exact' },
+    ], (v) => state.resize.mode === v, (v) => { state.resize.mode = v; });
+
+    const maxW = numInput({ min: 1, placeholder: 'W' }, () => state.resize.width, (v) => { state.resize.width = v; });
+    const maxH = numInput({ min: 1, placeholder: 'H' }, () => state.resize.height, (v) => { state.resize.height = v; });
+    const maxBox = el('div', { class: 'resize-inputs' },
+      maxW, el('span', { class: 'resize-sep', text: '×' }), maxH,
+      el('span', { class: 'resize-unit', text: 'px (bound the long edge)' }));
+
+    const pctInput = numInput({ min: 1, max: 1000 }, () => state.resize.percentage, (v) => { state.resize.percentage = v || 100; });
+    if (!pctInput.value) pctInput.value = state.resize.percentage || 100;
+    const pctBox = el('div', { class: 'resize-inputs' },
+      pctInput, el('span', { class: 'resize-unit', text: '%' }));
+
+    const exactW = numInput({ min: 1, placeholder: 'W' }, () => state.resize.width, (v) => { state.resize.width = v; });
+    const exactH = numInput({ min: 1, placeholder: 'H' }, () => state.resize.height, (v) => { state.resize.height = v; });
+    const exactBox = el('div', { class: 'resize-inputs' },
+      exactW, el('span', { class: 'resize-sep', text: '×' }), exactH,
+      el('span', { class: 'resize-unit', text: 'px (will crop to match)' }));
+
+    const upscaleRow = checkboxRow('Allow upscale (default off)',
+      () => !!state.resize.upscale, (v) => { state.resize.upscale = v; });
+    upscaleRow.classList.add('resize-upscale-row');
+
+    const previewLine = el('div', { class: 'resize-preview', hidden: true });
+
+    // -- Rotate / flip row
+    const rotateSeg = segmentedRow('Rotation', [
+      { label: '0°', value: 0 },
+      { label: '90°', value: 90 },
+      { label: '180°', value: 180 },
+      { label: '270°', value: 270 },
+    ], (v) => state.rotate === v, (v) => { state.rotate = v; });
+
+    const flipHRow = checkboxRow('Flip horizontal',
+      () => !!state.flip.horizontal, (v) => { state.flip.horizontal = v; });
+    const flipVRow = checkboxRow('Flip vertical',
+      () => !!state.flip.vertical, (v) => { state.flip.vertical = v; });
+
+    // -- Crop row
+    const cropSel = el('select', {
+      onchange: () => { state.crop.aspect = cropSel.value; changed(); },
+    });
+    for (const [value, label] of [
+      ['none', 'None'], ['1:1', '1:1 (square)'], ['4:3', '4:3'],
+      ['3:2', '3:2'], ['16:9', '16:9'], ['custom', 'Custom…'],
+    ]) {
+      cropSel.appendChild(el('option', { value, selected: state.crop.aspect === value, text: label }));
+    }
+    const cropW = numInput({ min: 1, placeholder: 'W' }, () => state.crop.customW, (v) => { state.crop.customW = v; });
+    const cropH = numInput({ min: 1, placeholder: 'H' }, () => state.crop.customH, (v) => { state.crop.customH = v; });
+    const cropCustomBox = el('div', { class: 'crop-custom-inputs' },
+      cropW, el('span', { class: 'resize-sep', text: ':' }), cropH);
+
+    // -- Kernel row
+    const kernelSel = el('select', {
+      class: 'transforms-kernel',
+      onchange: () => { state.kernel = kernelSel.value; changed(); },
+    });
+    for (const [value, label] of [
+      ['lanczos3', 'Lanczos 3 (default)'], ['lanczos2', 'Lanczos 2'],
+      ['mitchell', 'Mitchell'], ['cubic', 'Cubic'],
+      ['nearest', 'Nearest (sharp pixels)'],
+    ]) {
+      kernelSel.appendChild(el('option', { value, selected: state.kernel === value, text: label }));
+    }
+
+    // -- State-dependent visibility + derived text
+    function sync() {
+      maxBox.hidden = state.resize.mode !== 'max';
+      pctBox.hidden = state.resize.mode !== 'percentage';
+      exactBox.hidden = state.resize.mode !== 'exact';
+      upscaleRow.hidden = !(state.resize.mode === 'max' || state.resize.mode === 'percentage');
+      kernelSel.disabled = state.resize.mode === 'none';
+      const preview = computeResizePreview(state, previewEntry);
+      if (preview) {
+        previewLine.textContent = '→ ' + preview
+          + (previewEntry ? '' : ' (preview from first file)');
+        previewLine.hidden = false;
+      } else {
+        previewLine.hidden = true;
+      }
+    }
+    sync();
+
+    container.append(
+      el('div', { class: 'transforms-row' },
+        el('div', { class: 'field-label', text: 'Resize' }),
+        resizeSeg, maxBox, pctBox, exactBox, upscaleRow, previewLine),
+      el('div', { class: 'transforms-row' },
+        el('div', { class: 'field-label', text: 'Rotate & flip' }),
+        rotateSeg,
+        el('div', { class: 'flip-row' }, flipHRow, flipVRow)),
+      el('div', { class: 'transforms-row' },
+        el('div', { class: 'field-label', text: 'Crop to aspect' }),
+        el('div', { class: 'transforms-aspect-row' }, cropSel, cropCustomBox)),
+      el('div', { class: 'transforms-row' },
+        el('div', { class: 'field-label', text: 'Resample kernel' }),
+        kernelSel),
+    );
+
+    function syncCropVisibility() {
+      cropCustomBox.hidden = state.crop.aspect !== 'custom';
+    }
+    syncCropVisibility();
+    cropSel.addEventListener('change', syncCropVisibility);
+
+    return { sync };
+  }
+
   (function initTransformsUI() {
     const toggleBtn = document.getElementById('transforms-toggle');
     const body = document.getElementById('transforms-body');
     const badge = document.getElementById('transforms-badge');
     const resetBtn = document.getElementById('transforms-reset');
 
-    const resizeBtnRow = document.getElementById('resize-mode-buttons');
-    const resizeMaxW = document.getElementById('resize-max-w');
-    const resizeMaxH = document.getElementById('resize-max-h');
-    const resizePct = document.getElementById('resize-pct');
-    const resizeExactW = document.getElementById('resize-exact-w');
-    const resizeExactH = document.getElementById('resize-exact-h');
-    const resizeUpscale = document.getElementById('resize-upscale');
-    const resizeUpscaleRow = document.getElementById('resize-upscale-row');
-    const resizePreview = document.getElementById('resize-preview');
+    let panel = null;
 
-    const rotateBtnRow = document.getElementById('rotate-buttons');
-    const flipH = document.getElementById('flip-horizontal');
-    const flipV = document.getElementById('flip-vertical');
-
-    const cropAspectSel = document.getElementById('crop-aspect');
-    const cropCustomBox = document.getElementById('crop-custom-inputs');
-    const cropCustomW = document.getElementById('crop-custom-w');
-    const cropCustomH = document.getElementById('crop-custom-h');
-
-    const kernelSel = document.getElementById('resample-kernel');
+    function renderGlobalTransforms() {
+      panel = buildTransformsPanel(body, transformsState, {
+        onChange: refreshTransformsUI,
+      });
+    }
 
     // -- Collapsible body
     toggleBtn.addEventListener('click', () => {
@@ -2866,117 +2972,10 @@
       toggleBtn.setAttribute('aria-expanded', String(!open));
     });
 
-    // -- Mode segmented buttons
-    function setActiveSegmented(row, value, dataAttr) {
-      row.querySelectorAll('.transforms-seg-btn').forEach((b) => {
-        const isActive = b.dataset[dataAttr] === String(value);
-        b.classList.toggle('active', isActive);
-        b.setAttribute('aria-checked', String(isActive));
-      });
-    }
-
-    resizeBtnRow.addEventListener('click', (e) => {
-      const btn = e.target.closest('.transforms-seg-btn');
-      if (!btn) return;
-      const mode = btn.dataset.mode;
-      transformsState.resize.mode = mode;
-      setActiveSegmented(resizeBtnRow, mode, 'mode');
-      syncResizeInputs();
-      refreshTransformsUI();
-    });
-
-    rotateBtnRow.addEventListener('click', (e) => {
-      const btn = e.target.closest('.transforms-seg-btn');
-      if (!btn) return;
-      transformsState.rotate = Number(btn.dataset.rotate);
-      setActiveSegmented(rotateBtnRow, transformsState.rotate, 'rotate');
-      refreshTransformsUI();
-    });
-
-    // -- Resize inputs
-    function syncResizeInputs() {
-      document.getElementById('resize-inputs-max').hidden = transformsState.resize.mode !== 'max';
-      document.getElementById('resize-inputs-percentage').hidden = transformsState.resize.mode !== 'percentage';
-      document.getElementById('resize-inputs-exact').hidden = transformsState.resize.mode !== 'exact';
-      resizeUpscaleRow.hidden = !(transformsState.resize.mode === 'max' || transformsState.resize.mode === 'percentage');
-      kernelSel.disabled = transformsState.resize.mode === 'none';
-    }
-    resizeMaxW.addEventListener('input', () => {
-      transformsState.resize.width = Number(resizeMaxW.value) || 0;
-      refreshTransformsUI();
-    });
-    resizeMaxH.addEventListener('input', () => {
-      transformsState.resize.height = Number(resizeMaxH.value) || 0;
-      refreshTransformsUI();
-    });
-    resizePct.addEventListener('input', () => {
-      transformsState.resize.percentage = Number(resizePct.value) || 100;
-      refreshTransformsUI();
-    });
-    resizeExactW.addEventListener('input', () => {
-      transformsState.resize.width = Number(resizeExactW.value) || 0;
-      refreshTransformsUI();
-    });
-    resizeExactH.addEventListener('input', () => {
-      transformsState.resize.height = Number(resizeExactH.value) || 0;
-      refreshTransformsUI();
-    });
-    resizeUpscale.addEventListener('change', () => {
-      transformsState.resize.upscale = resizeUpscale.checked;
-      refreshTransformsUI();
-    });
-
-    // -- Flip
-    flipH.addEventListener('change', () => {
-      transformsState.flip.horizontal = flipH.checked;
-      refreshTransformsUI();
-    });
-    flipV.addEventListener('change', () => {
-      transformsState.flip.vertical = flipV.checked;
-      refreshTransformsUI();
-    });
-
-    // -- Crop
-    cropAspectSel.addEventListener('change', () => {
-      transformsState.crop.aspect = cropAspectSel.value;
-      cropCustomBox.hidden = transformsState.crop.aspect !== 'custom';
-      refreshTransformsUI();
-    });
-    cropCustomW.addEventListener('input', () => {
-      transformsState.crop.customW = Number(cropCustomW.value) || 0;
-      refreshTransformsUI();
-    });
-    cropCustomH.addEventListener('input', () => {
-      transformsState.crop.customH = Number(cropCustomH.value) || 0;
-      refreshTransformsUI();
-    });
-
-    // -- Kernel
-    kernelSel.addEventListener('change', () => {
-      transformsState.kernel = kernelSel.value;
-      refreshTransformsUI();
-    });
-
-    // -- Reset
+    // -- Reset: swap in a fresh defaults object and re-render the panel.
     resetBtn.addEventListener('click', () => {
       transformsState = TRANSFORMS_DEFAULTS();
-      // Reset all inputs to defaults
-      setActiveSegmented(resizeBtnRow, 'none', 'mode');
-      setActiveSegmented(rotateBtnRow, 0, 'rotate');
-      resizeMaxW.value = '';
-      resizeMaxH.value = '';
-      resizePct.value = '100';
-      resizeExactW.value = '';
-      resizeExactH.value = '';
-      resizeUpscale.checked = false;
-      flipH.checked = false;
-      flipV.checked = false;
-      cropAspectSel.value = 'none';
-      cropCustomBox.hidden = true;
-      cropCustomW.value = '';
-      cropCustomH.value = '';
-      kernelSel.value = 'lanczos3';
-      syncResizeInputs();
+      renderGlobalTransforms();
       refreshTransformsUI();
     });
 
@@ -2991,19 +2990,12 @@
         badge.hidden = true;
         resetBtn.hidden = true;
       }
-      const preview = computeResizePreview();
-      if (preview) {
-        resizePreview.textContent = '→ ' + preview + ' (preview from first file)';
-        resizePreview.hidden = false;
-      } else {
-        resizePreview.hidden = true;
-      }
+      if (panel) panel.sync(); // preview text depends on files + state
       // Per-row notices may need to mention the active transforms
       if (typeof refreshFileNotices === 'function') refreshFileNotices();
     };
 
-    // Initial sync (no-op state, but makes sure UI matches)
-    syncResizeInputs();
+    renderGlobalTransforms();
     refreshTransformsUI();
   })();
 
