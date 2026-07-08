@@ -5,7 +5,7 @@ All notable changes to LocalPix will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project loosely follows [Semantic Versioning](https://semver.org/).
 
-## [1.4.0] — 2026-06-10 "Full Control"
+## [1.4.1] — 2026-07-08 "Full Control"
 
 ### Added
 
@@ -50,6 +50,15 @@ and this project loosely follows [Semantic Versioning](https://semver.org/).
 - Combining rotate 90°/270° with an aspect-ratio crop or percentage
   resize used the pre-rotation dimensions, producing wrong crop geometry.
   Transform steps now track the running dimensions through the pipeline.
+- **Dependencies.** Resolved 6 Dependabot advisories via `npm audit fix`
+  — most notably `multer` 2.1.1 → 2.2.0 (two DoS advisories; the rest
+  are transitive `electron-builder`/`electron` build-time bumps, never
+  shipped in the packaged app).
+- **Security.** Closed two CodeQL alerts in the filename-template code:
+  a path-injection gap in the `{n}`-collision probe (a fallback branch
+  could reach `fs.existsSync` with unsanitized, attacker-controlled
+  data) and a polynomial-regex ReDoS in the stem-trimming logic,
+  replaced with a linear manual scan.
 
 ## [1.3.0] — 2026-06-10
 
