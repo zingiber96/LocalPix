@@ -412,35 +412,54 @@ function applyMetadataOptions(pipeline, opts) {
 // positive integer whose rendered name is free, so a batch naturally counts
 // 1, 2, 3… Sanitization strips path separators and characters that are
 // invalid on macOS/Windows; resolveOutputPath() re-validates downstream.
+//
+// tokens.name (the uploaded file's original stem) is attacker-controlled —
+// multer doesn't sanitize originalname — so it's run through sanitizeStem()
+// once up front, and every candidate built from `stem` is basename()'d
+// immediately before it touches the filesystem in the {n}-collision probe
+// below. Closes CodeQL's path-injection alert structurally, mirroring
+// resolveOutputPath()'s defensive re-normalization.
 function renderFilenameStem(template, tokens, ext) {
+  const safeName = sanitizeStem(tokens.name);
   let stem = String(template)
-    .replaceAll('{name}', tokens.name)
+    .replaceAll('{name}', safeName)
     .replaceAll('{format}', tokens.format)
     .replaceAll('{date}', tokens.date)
     .replaceAll('{width}', tokens.width != null ? String(tokens.width) : '')
     .replaceAll('{height}', tokens.height != null ? String(tokens.height) : '');
 
   stem = sanitizeStem(stem);
-  if (!stem.replace(/\{n\}/g, '')) stem = tokens.name + (stem.includes('{n}') ? '_{n}' : '');
+  if (!stem.replace(/\{n\}/g, '')) stem = safeName + (stem.includes('{n}') ? '_{n}' : '');
 
   if (stem.includes('{n}')) {
     const dir = path.resolve(outputDir);
     for (let n = 1; n < 100000; n++) {
-      const candidate = stem.replaceAll('{n}', String(n));
+      const candidate = path.basename(stem.replaceAll('{n}', String(n)));
       if (!fs.existsSync(path.join(dir, `${candidate}.${ext}`))) return candidate;
     }
     // Pathological: 100k collisions — fall through with n stripped and let
     // resolveOutputPath()'s timestamp suffix disambiguate.
     stem = stem.replaceAll('{n}', '');
   }
-  return sanitizeStem(stem) || tokens.name;
+  return path.basename(sanitizeStem(stem)) || safeName;
 }
 
+// Strips path separators / OS-reserved characters, then trims leading and
+// trailing whitespace-or-dot characters. Deliberately NOT a single
+// ^[\s.]+|[\s.]+$ regex — that pattern (anchors + alternation + quantifier
+// under the g flag) is what CodeQL's js/polynomial-redos query flagged on
+// attacker-controlled input. This two-pointer scan is linear in the input
+// length by construction — no backtracking is possible.
 function sanitizeStem(s) {
-  return String(s)
+  const stripped = String(s)
     // eslint-disable-next-line no-control-regex
-    .replace(/[\\/:*?"<>|\x00-\x1f]/g, '-')
-    .replace(/^[\s.]+|[\s.]+$/g, '');
+    .replace(/[\\/:*?"<>|\x00-\x1f]/g, '-');
+  const isTrimChar = (c) => c === '.' || /\s/.test(c);
+  let start = 0;
+  let end = stripped.length;
+  while (start < end && isTrimChar(stripped[start])) start++;
+  while (end > start && isTrimChar(stripped[end - 1])) end--;
+  return stripped.slice(start, end);
 }
 
 function localDateStr() {
