@@ -9,6 +9,7 @@ const sharp = require('sharp');
 const path = require('path');
 const fs = require('fs');
 const magick = require('./lib/magick');
+const pdf = require('./lib/pdf');
 
 // Output dir and port are configurable so the same server can run as a
 // standalone process (`npm start`) or be embedded in the Electron app.
@@ -72,6 +73,7 @@ const INPUT_MIMES = new Set([
   'image/vnd.adobe.photoshop', 'application/x-photoshop',
   'application/photoshop', 'application/psd', 'image/x-photoshop',
   'image/jxl',
+  'application/pdf',
   // Note: RAW camera formats (NEF/CR2/DNG/ARW/etc.) were investigated for
   // v1.2 — magick-wasm "accepts" them but only extracts the tiny embedded
   // preview (typically 160×120), not the full demosaiced sensor data. That
@@ -82,7 +84,7 @@ const INPUT_EXTS = new Set([
   '.jpg', '.jpeg', '.png', '.webp', '.avif', '.gif',
   '.heic', '.heif', '.heics', '.heifs',
   '.tif', '.tiff', '.bmp', '.svg', '.psd',
-  '.jxl',
+  '.jxl', '.pdf',
 ]);
 
 // -- Small helpers ------------------------------------------------------------
@@ -101,10 +103,12 @@ function parseHexColor(s) {
 }
 
 // detectSourceKind: which decoder path do we take?
-// Returns one of: jpeg, png, webp, avif, gif, heif, tiff, bmp, svg, psd, jxl, unknown.
+// Returns one of: jpeg, png, webp, avif, gif, heif, tiff, bmp, svg, psd, jxl,
+// pdf, unknown.
 function detectSourceKind(file) {
   const ext = path.extname(file.originalname || '').toLowerCase();
   const mime = (file.mimetype || '').toLowerCase();
+  if (ext === '.pdf' || mime === 'application/pdf') return 'pdf';
   if (ext === '.psd' || mime.includes('photoshop') || mime === 'application/psd') return 'psd';
   if (ext === '.bmp' || mime === 'image/bmp') return 'bmp';
   if (
@@ -135,9 +139,16 @@ const SHARP_NATIVE_SOURCES = new Set([
 // Build a sharp pipeline from the uploaded buffer. SVG keeps its density-
 // aware decode; sharp-native formats pass through unchanged; everything else
 // is decoded by magick-wasm to raw RGBA and re-entered into sharp's pipeline.
-async function buildSourcePipeline(file, sourceKind, { density }) {
+async function buildSourcePipeline(file, sourceKind, { density, pdfPage }) {
   if (sourceKind === 'svg') {
     return sharp(file.buffer, { density });
+  }
+
+  if (sourceKind === 'pdf') {
+    // mupdf rasterises one page (1-based, clamped to the document) at the
+    // same density used for SVG input, then re-enters the sharp pipeline.
+    const { png } = await pdf.renderPageToPng(file.buffer, { page: pdfPage, density });
+    return sharp(png);
   }
 
   if (SHARP_NATIVE_SOURCES.has(sourceKind)) {
@@ -196,38 +207,55 @@ function packIco(pngBuffers, sizes) {
 async function applyTransforms(pipeline, t) {
   if (!t || typeof t !== 'object') return pipeline;
 
-  // Source dims are lazily fetched — only needed for crop and percentage
-  // resize. clone() so the metadata read doesn't consume the pipeline.
-  let _meta;
-  async function meta() {
-    if (!_meta) _meta = await pipeline.clone().metadata();
-    return _meta;
-  }
-
   let p = pipeline;
 
-  // 1) Rotate. Only fixed 90° increments are accepted; anything else is a
+  // Track the logical width/height through each step so the later steps
+  // (aspect crop, percentage resize) see post-transform dimensions instead
+  // of the original metadata. One cheap header read up front; only runs
+  // when a transforms payload is present, so the byte-identical default
+  // path never touches it.
+  const meta0 = await pipeline.clone().metadata();
+  let curW = meta0.width || 0;
+  let curH = meta0.height || 0;
+
+  // 1) Explicit pixel crop (the manual crop overlay). The box is expressed
+  //    in ORIGINAL source pixels — what the user drew on the un-rotated
+  //    preview — so it's applied before any orientation change. When a box
+  //    is present the aspect-ratio crop below is skipped.
+  const explicitBox = parseExplicitCropBox(t.crop);
+  if (explicitBox && curW && curH) {
+    const c = clampCropBox(explicitBox, curW, curH);
+    if (c) {
+      p = p.extract(c);
+      curW = c.width;
+      curH = c.height;
+    }
+  }
+
+  // 2) Rotate. Only fixed 90° increments are accepted; anything else is a
   //    no-op so a malformed input doesn't accidentally rotate by 7°.
   if (t.rotate === 90 || t.rotate === 180 || t.rotate === 270) {
     p = p.rotate(t.rotate);
+    if (t.rotate !== 180) [curW, curH] = [curH, curW];
   }
 
-  // 2) Flip. sharp.flip() is vertical (top↔bottom mirror); .flop() is
+  // 3) Flip. sharp.flip() is vertical (top↔bottom mirror); .flop() is
   //    horizontal (left↔right). Apply each independently.
   if (t.flip && t.flip.vertical) p = p.flip();
   if (t.flip && t.flip.horizontal) p = p.flop();
 
-  // 3) Crop to aspect ratio (center crop).
-  const cropAspect = parseCropAspect(t.crop);
-  if (cropAspect) {
-    const m = await meta();
-    if (m.width && m.height) {
-      const cropBox = computeCenterCrop(m.width, m.height, cropAspect[0], cropAspect[1]);
-      if (cropBox) p = p.extract(cropBox);
+  // 4) Crop to aspect ratio (center crop) — post-rotation dimensions.
+  const cropAspect = explicitBox ? null : parseCropAspect(t.crop);
+  if (cropAspect && curW && curH) {
+    const cropBox = computeCenterCrop(curW, curH, cropAspect[0], cropAspect[1]);
+    if (cropBox) {
+      p = p.extract(cropBox);
+      curW = cropBox.width;
+      curH = cropBox.height;
     }
   }
 
-  // 4) Resize.
+  // 5) Resize.
   if (t.resize && t.resize.mode && t.resize.mode !== 'none') {
     const kernel = ['nearest', 'cubic', 'mitchell', 'lanczos2', 'lanczos3'].includes(t.kernel)
       ? t.kernel
@@ -262,18 +290,41 @@ async function applyTransforms(pipeline, t) {
       const pct = parsePositiveInt(t.resize.percentage);
       // pct === 100 is a no-op; pct > 100 with upscale=false is also a
       // no-op (user explicitly disabled enlargement).
-      if (pct && pct !== 100 && !(pct > 100 && !upscale)) {
-        const m = await meta();
-        if (m.width && m.height) {
-          const w = Math.max(1, Math.round((m.width * pct) / 100));
-          const h = Math.max(1, Math.round((m.height * pct) / 100));
-          p = p.resize({ width: w, height: h, fit: 'fill', kernel });
-        }
+      if (pct && pct !== 100 && !(pct > 100 && !upscale) && curW && curH) {
+        const w = Math.max(1, Math.round((curW * pct) / 100));
+        const h = Math.max(1, Math.round((curH * pct) / 100));
+        p = p.resize({ width: w, height: h, fit: 'fill', kernel });
       }
     }
   }
 
   return p;
+}
+
+// Parse the manual crop overlay's explicit pixel box from a transforms crop
+// object: { box: { left, top, width, height } } in original source pixels.
+// Returns null for anything malformed.
+function parseExplicitCropBox(crop) {
+  if (!crop || typeof crop !== 'object' || !crop.box || typeof crop.box !== 'object') return null;
+  const left = Number.parseInt(crop.box.left, 10);
+  const top = Number.parseInt(crop.box.top, 10);
+  const width = Number.parseInt(crop.box.width, 10);
+  const height = Number.parseInt(crop.box.height, 10);
+  if (![left, top, width, height].every(Number.isFinite)) return null;
+  if (left < 0 || top < 0 || width <= 0 || height <= 0) return null;
+  return { left, top, width, height };
+}
+
+// Clamp a crop box to the image bounds. Returns null when the box lies
+// entirely outside the image (in which case the crop is skipped).
+function clampCropBox(box, srcW, srcH) {
+  if (box.left >= srcW || box.top >= srcH) return null;
+  return {
+    left: box.left,
+    top: box.top,
+    width: Math.min(box.width, srcW - box.left),
+    height: Math.min(box.height, srcH - box.top),
+  };
 }
 
 function parsePositiveInt(v) {
@@ -354,6 +405,50 @@ function applyMetadataOptions(pipeline, opts) {
   return pipeline;
 }
 
+// -- Filename templates --------------------------------------------------------
+// Render the user's output-filename template into a safe stem (no extension).
+// Tokens: {name} {format} {date} {width} {height} {n}. Unknown {tokens} are
+// left literal. {n} is resolved against the live output dir: the smallest
+// positive integer whose rendered name is free, so a batch naturally counts
+// 1, 2, 3… Sanitization strips path separators and characters that are
+// invalid on macOS/Windows; resolveOutputPath() re-validates downstream.
+function renderFilenameStem(template, tokens, ext) {
+  let stem = String(template)
+    .replaceAll('{name}', tokens.name)
+    .replaceAll('{format}', tokens.format)
+    .replaceAll('{date}', tokens.date)
+    .replaceAll('{width}', tokens.width != null ? String(tokens.width) : '')
+    .replaceAll('{height}', tokens.height != null ? String(tokens.height) : '');
+
+  stem = sanitizeStem(stem);
+  if (!stem.replace(/\{n\}/g, '')) stem = tokens.name + (stem.includes('{n}') ? '_{n}' : '');
+
+  if (stem.includes('{n}')) {
+    const dir = path.resolve(outputDir);
+    for (let n = 1; n < 100000; n++) {
+      const candidate = stem.replaceAll('{n}', String(n));
+      if (!fs.existsSync(path.join(dir, `${candidate}.${ext}`))) return candidate;
+    }
+    // Pathological: 100k collisions — fall through with n stripped and let
+    // resolveOutputPath()'s timestamp suffix disambiguate.
+    stem = stem.replaceAll('{n}', '');
+  }
+  return sanitizeStem(stem) || tokens.name;
+}
+
+function sanitizeStem(s) {
+  return String(s)
+    // eslint-disable-next-line no-control-regex
+    .replace(/[\\/:*?"<>|\x00-\x1f]/g, '-')
+    .replace(/^[\s.]+|[\s.]+$/g, '');
+}
+
+function localDateStr() {
+  const d = new Date();
+  const pad = (x) => String(x).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+}
+
 // -- Output dispatch table ----------------------------------------------------
 // Each entry: { ext, encode(pipeline, opts, ctx) -> Buffer }.
 // To add a future format, add an entry here and a matching entry to
@@ -417,7 +512,7 @@ const ENCODERS = {
 
   jxl: {
     ext: 'jxl',
-    async encode(pipeline, opts) {
+    async encode(pipeline, opts, ctx) {
       // JPEG XL — modern, royalty-free, generally better than WebP at
       // similar quality. Sharp's prebuilt libvips doesn't include libjxl,
       // so we encode via magick-wasm. Default effort 7 matches libjxl's
@@ -429,6 +524,7 @@ const ENCODERS = {
         .ensureAlpha()
         .raw()
         .toBuffer({ resolveWithObject: true });
+      if (ctx) ctx.outDims = { width: info.width, height: info.height };
       return magick.encodeFromRawRgba(
         { width: info.width, height: info.height, data },
         'jxl',
@@ -462,12 +558,13 @@ const ENCODERS = {
 
   bmp: {
     ext: 'bmp',
-    async encode(pipeline) {
+    async encode(pipeline, opts, ctx) {
       // sharp cannot write BMP; produce raw RGBA and hand to magick-wasm.
       const { data, info } = await pipeline
         .ensureAlpha()
         .raw()
         .toBuffer({ resolveWithObject: true });
+      if (ctx) ctx.outDims = { width: info.width, height: info.height };
       return magick.encodeFromRawRgba(
         { width: info.width, height: info.height, data },
         'bmp',
@@ -477,7 +574,7 @@ const ENCODERS = {
 
   ico: {
     ext: 'ico',
-    async encode(pipeline, opts) {
+    async encode(pipeline, opts, ctx) {
       const allowed = [16, 32, 48, 64, 128, 256];
       const requested = Array.isArray(opts.sizes) && opts.sizes.length
         ? opts.sizes.map(Number).filter((n) => allowed.includes(n))
@@ -488,6 +585,10 @@ const ENCODERS = {
       // Materialise the source as a PNG once, then resize from that for each
       // requested icon size. fit:'contain' with transparent padding handles
       // non-square sources (pad, do not crop or stretch).
+      if (ctx) {
+        const largest = sizes[sizes.length - 1];
+        ctx.outDims = { width: largest, height: largest };
+      }
       const srcPng = await pipeline.png().toBuffer();
       const pngBuffers = [];
       for (const size of sizes) {
@@ -592,6 +693,23 @@ function createApp() {
     });
   });
 
+  // Lightweight PDF probe — returns the page count so the frontend can cap
+  // its page picker and iterate "All pages" conversions client-side.
+  app.post('/api/pdf-info', convertLimiter, upload.single('image'), async (req, res) => {
+    if (!req.file) {
+      return res.status(400).json({ error: 'No file uploaded.' });
+    }
+    if (detectSourceKind(req.file) !== 'pdf') {
+      return res.status(400).json({ error: 'Not a PDF.' });
+    }
+    try {
+      const pageCount = await pdf.countPages(req.file.buffer);
+      res.json({ pageCount });
+    } catch (err) {
+      res.status(500).json({ error: `Could not read PDF: ${err.message}` });
+    }
+  });
+
   app.post('/api/convert', convertLimiter, upload.single('image'), async (req, res) => {
     if (!req.file) {
       return res.status(400).json({ error: 'No file uploaded.' });
@@ -636,16 +754,48 @@ function createApp() {
     }
 
     const density = clamp(req.body.inputDensity, 72, 1440, 192);
+    // PDF page selection (1-based). Out-of-range values are clamped to the
+    // document's page count inside lib/pdf.js, so a high upper bound here
+    // just guards against absurd input.
+    const pdfPage = clamp(req.body.pdfPage, 1, 100000, 1);
     const sourceKind = detectSourceKind(req.file);
 
     const originalStem = path.parse(req.file.originalname).name;
-    const outputFilename = `${originalStem}.${encoder.ext}`;
-    const outputPath = resolveOutputPath(outputFilename);
+    // Output filename template (v1.4). Absent/blank/'{name}' → the historical
+    // `originalStem.ext` naming, so existing callers see no change.
+    const filenameTemplate = typeof req.body.filenameTemplate === 'string'
+      ? req.body.filenameTemplate.trim()
+      : '';
 
     try {
-      let pipeline = await buildSourcePipeline(req.file, sourceKind, { density });
+      let pipeline = await buildSourcePipeline(req.file, sourceKind, { density, pdfPage });
       pipeline = await applyTransforms(pipeline, transforms);
-      const outputBuffer = await encoder.encode(pipeline, opts, { sourceKind });
+      // ctx lets encoders report the encoded dimensions (outDims) for outputs
+      // sharp can't re-read (BMP, JXL, ICO) so {width}/{height} still resolve.
+      const ctx = { sourceKind };
+      const outputBuffer = await encoder.encode(pipeline, opts, ctx);
+
+      let stem = originalStem;
+      if (filenameTemplate && filenameTemplate !== '{name}') {
+        let dims = ctx.outDims || null;
+        if (!dims && /\{(width|height)\}/.test(filenameTemplate)) {
+          try {
+            const m = await sharp(outputBuffer).metadata();
+            dims = { width: m.width, height: m.height };
+          } catch (e) {
+            // Output not sharp-readable and encoder didn't report dims —
+            // the tokens render as empty rather than failing the convert.
+          }
+        }
+        stem = renderFilenameStem(filenameTemplate, {
+          name: originalStem,
+          format: encoder.ext,
+          date: localDateStr(),
+          width: dims ? dims.width : null,
+          height: dims ? dims.height : null,
+        }, encoder.ext);
+      }
+      const outputPath = resolveOutputPath(`${stem}.${encoder.ext}`);
       fs.writeFileSync(outputPath, outputBuffer);
 
       res.json({

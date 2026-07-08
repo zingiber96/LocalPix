@@ -20,7 +20,7 @@ Convert between JPEG, PNG, WebP, AVIF, JPEG XL, GIF, TIFF, BMP and ICO — witho
 - **It's local.** Your images never leave your computer. No upload, no account, no telemetry.
 - **It's free and open source.** Use it for personal or commercial work; no subscriptions, no watermarks.
 - **It's fast.** Native image processing — typical conversions are done in milliseconds.
-- **It supports the formats you actually have.** Read 10 common formats including iPhone HEIC, Photoshop PSD, and SVG. Write 9, including modern ones like AVIF and JPEG XL.
+- **It supports the formats you actually have.** Read 11 common formats including iPhone HEIC, Photoshop PSD, SVG, and PDF. Write 9, including modern ones like AVIF and JPEG XL.
 - **It handles batches.** Drop a whole folder, convert everything at once. Per-format quality controls, privacy controls, custom output folder.
 
 ## Download
@@ -68,7 +68,11 @@ Converted files land in `~/Documents/LocalPix/` by default. Click **Change…** 
 
 ### Inputs (formats LocalPix can read)
 
-JPEG · PNG · WebP · AVIF · GIF · **HEIF/HEIC** · TIFF · BMP · **SVG** · **PSD**
+JPEG · PNG · WebP · AVIF · GIF · **HEIF/HEIC** · TIFF · BMP · **SVG** · **PSD** · **PDF**
+
+PDF input renders one page per conversion (pick the page with the **PDF page
+to convert** field that appears when a PDF is in the list). Pages are
+rasterised at 192 dpi via [MuPDF](https://mupdf.com/), fully offline.
 
 ### Outputs (formats LocalPix can save as)
 
@@ -108,10 +112,16 @@ Online converters upload your image to their server, process it, and let you dow
 LocalPix avoids all of that.
 
 **Can I resize, rotate, or crop images while converting?**
-Yes — open the **Transforms** section in the app (collapsed by default; click the chevron). You can resize (max dimension, percentage, or exact dimensions), rotate in 90° increments, flip horizontally or vertically, crop to a fixed aspect ratio (1:1, 4:3, 3:2, 16:9, or custom), and choose a resampling kernel. Transforms apply in a fixed order — orient → crop → resize — so the result is predictable. The same transforms apply to every file in the batch.
+Yes — open the **Transforms** section in the app (collapsed by default; click the chevron). You can resize (max dimension, percentage, or exact dimensions), rotate in 90° increments, flip horizontally or vertically, crop to a fixed aspect ratio (1:1, 4:3, 3:2, 16:9, or custom), and choose a resampling kernel. Transforms apply in a fixed order — crop → orient → resize — so the result is predictable. Global transforms apply to every file; the pencil button on a file row opens per-file settings (format, options, and transforms) that override the globals for just that file.
 
-**Will it support [PDF / RAW camera files / other format]?**
-PDF input is on the roadmap (deferred from v1.1 because it needs a separate decoder library — magick-wasm's PDF path relies on a Ghostscript binary that can't be bundled). RAW input (DNG, CR2, NEF, ARW, etc.) was investigated for v1.2 — magick-wasm accepts the files but only extracts the small embedded preview thumbnail, not the full demosaiced sensor data, so it's deferred until a real RAW decoder (libraw-wasm or similar) lands in a future version. See [CHANGELOG.md](CHANGELOG.md) and [Issues](../../issues) for current status.
+**Can I crop to an exact region instead of an aspect ratio?**
+Yes — open a file's per-file settings (pencil button) and click **Crop…** in the Transforms section. Drag to select the region (corner/edge handles, optional aspect lock, live pixel readout); the selection is stored in source pixels and applied before any rotation or resize. Manual crop needs a format the browser can preview (not PSD/HEIF/TIFF/BMP/PDF).
+
+**Can I control how output files are named?**
+Yes — the **Filename** field next to the output folder takes a template with tokens: `{name}` (original name), `{format}`, `{width}`, `{height}`, `{date}`, and `{n}` (auto-incrementing counter). For example `{name}-{width}x{height}` produces `photo-1920x1080.webp`. Leave it empty to keep the original filename.
+
+**Will it support [RAW camera files / other format]?**
+PDF input landed in v1.4 (rendered by MuPDF, one page per conversion). RAW input (DNG, CR2, NEF, ARW, etc.) was investigated for v1.2 — magick-wasm accepts the files but only extracts the small embedded preview thumbnail, not the full demosaiced sensor data, so it's deferred until a real RAW decoder (libraw-wasm or similar) lands in a future version. See [CHANGELOG.md](CHANGELOG.md) and [Issues](../../issues) for current status.
 
 **What's new in this version?**
 See [CHANGELOG.md](CHANGELOG.md).

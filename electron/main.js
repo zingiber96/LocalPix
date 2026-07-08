@@ -149,6 +149,21 @@ ipcMain.handle('localpix:get-output-folder',    () => getOutputDir());
 ipcMain.handle('localpix:select-output-folder', () => pickOutputFolder());
 ipcMain.handle('localpix:open-output-folder',   () => shell.openPath(getOutputDir()));
 
+// Settings presets — stored in config.json next to outputDir. The renderer
+// owns the shape ({ name: { target, opts, transforms } }); main just
+// persists it. Guard the size so a runaway renderer can't bloat the file.
+ipcMain.handle('localpix:get-presets', () => readConfig().presets || {});
+ipcMain.handle('localpix:set-presets', (_event, presets) => {
+  if (!presets || typeof presets !== 'object' || Array.isArray(presets)) {
+    throw new Error('Presets must be an object.');
+  }
+  if (JSON.stringify(presets).length > 512 * 1024) {
+    throw new Error('Presets payload too large.');
+  }
+  writeConfig({ ...readConfig(), presets });
+  return true;
+});
+
 // macOS Dock icon — swap between light and dark variants when the system
 // appearance changes. This only affects the live Dock icon; the Finder /
 // Applications-folder icon is static (driven by Contents/Resources/icon.icns

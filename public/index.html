@@ -460,7 +460,7 @@
       border: 1px solid var(--border);
     }
 
-    select, input[type=number] {
+    select, input[type=number], input[type=text] {
       width: 100%;
       padding: 6px 10px;
       border: 1px solid var(--border-strong);
@@ -473,7 +473,7 @@
       transition: border-color 0.12s, box-shadow 0.12s;
     }
 
-    select:focus, input[type=number]:focus {
+    select:focus, input[type=number]:focus, input[type=text]:focus {
       outline: none;
       border-color: var(--accent);
       box-shadow: 0 0 0 3px var(--accent-ring);
@@ -706,8 +706,8 @@
       width: 64px;
     }
 
-    #resample-kernel { width: auto; min-width: 220px; }
-    #resample-kernel:disabled { opacity: 0.6; }
+    .transforms-kernel { width: auto; min-width: 220px; }
+    .transforms-kernel:disabled { opacity: 0.6; }
 
     /* --- Output folder row --------------------------------------------- */
 
@@ -759,6 +759,10 @@
       white-space: nowrap;
       font-family: inherit;
     }
+
+    /* Author display rules beat the UA's [hidden] { display:none } — restate
+       it so JS-toggled `hidden` works on buttons. */
+    .btn[hidden] { display: none; }
 
     .btn:active:not(:disabled) { transform: translateY(0.5px); }
     .btn:disabled { opacity: 0.45; cursor: not-allowed; }
@@ -1130,6 +1134,32 @@
     }
     .section-header-row .section-label { margin-bottom: 0; }
 
+    .preset-bar {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      flex-wrap: wrap;
+    }
+    .preset-bar select { font-size: 11.5px; padding: 4px 8px; }
+    #preset-delete:hover { color: var(--danger); }
+
+    /* Clickable filename-template token chips */
+    .token-chip {
+      font-family: var(--font-mono);
+      font-size: 10.5px;
+      background: var(--surface-2);
+      border: 1px solid var(--border);
+      border-radius: 3px;
+      padding: 1px 6px;
+      color: var(--text);
+      cursor: pointer;
+      transition: border-color 0.12s, color 0.12s;
+    }
+    .token-chip:hover {
+      border-color: var(--accent);
+      color: var(--accent);
+    }
+
     /* --- Per-file override UI --------------------------------------------- */
 
     /* Customize toggle button: accent hover instead of danger */
@@ -1239,12 +1269,119 @@
       gap: 14px 24px;
     }
 
-    /* Transforms snapshot info line */
-    .override-tx-summary {
+    /* --- Manual crop modal --------------------------------------------- */
+
+    .crop-backdrop {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.55);
+      display: grid;
+      place-items: center;
+      z-index: 100;
+      padding: 20px;
+    }
+
+    .crop-modal {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      box-shadow: 0 12px 40px rgba(0, 0, 0, 0.35);
+      padding: 14px;
+      max-width: calc(100vw - 40px);
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .crop-modal-bar {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+    .crop-modal-bar select { width: auto; }
+    .crop-modal-bar .crop-readout {
+      font-family: var(--font-mono);
       font-size: 11.5px;
       color: var(--text-muted);
+      margin-left: auto;
+    }
+
+    .crop-stage {
+      position: relative;
+      align-self: center;
+      /* Prevent the browser from hijacking drags for scrolling on touch. */
+      touch-action: none;
+      user-select: none;
+      line-height: 0;
+      cursor: crosshair;
+      /* Clip the crop-rect's dimming shade to the image area — without this
+         the 9999px box-shadow spills over the whole modal and greys out the
+         toolbar/footer too. */
+      overflow: hidden;
+      border-radius: 4px;
+    }
+    .crop-stage img {
+      max-width: min(760px, calc(100vw - 90px));
+      max-height: 58vh;
+      display: block;
+      border-radius: 4px;
+    }
+
+    .crop-rect {
+      position: absolute;
+      border: 1.5px solid #fff;
+      outline: 1px solid rgba(0, 0, 0, 0.6);
+      /* Dim everything outside the selection */
+      box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.45);
+      cursor: move;
+    }
+    .crop-rect[hidden] { display: none; }
+
+    .crop-handle {
+      position: absolute;
+      width: 12px;
+      height: 12px;
+      background: #fff;
+      border: 1px solid rgba(0, 0, 0, 0.6);
+      border-radius: 2px;
+      /* centred on the rect's corners/edges */
+      margin: -6px;
+    }
+    .crop-handle[data-h="nw"] { left: 0;   top: 0;    cursor: nwse-resize; }
+    .crop-handle[data-h="ne"] { left: 100%; top: 0;   cursor: nesw-resize; }
+    .crop-handle[data-h="sw"] { left: 0;   top: 100%; cursor: nesw-resize; }
+    .crop-handle[data-h="se"] { left: 100%; top: 100%; cursor: nwse-resize; }
+    .crop-handle[data-h="n"]  { left: 50%; top: 0;    cursor: ns-resize; }
+    .crop-handle[data-h="s"]  { left: 50%; top: 100%; cursor: ns-resize; }
+    .crop-handle[data-h="w"]  { left: 0;   top: 50%;  cursor: ew-resize; }
+    .crop-handle[data-h="e"]  { left: 100%; top: 50%; cursor: ew-resize; }
+    .crop-handle[hidden] { display: none; }
+
+    .crop-modal-footer {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      justify-content: flex-end;
+    }
+    .crop-modal-footer .crop-note {
+      font-size: 11px;
+      color: var(--text-faint);
       font-style: italic;
-      margin-top: 10px;
+      margin-right: auto;
+    }
+
+    /* Manual crop controls inside the transforms panel (drawer only) */
+    .crop-manual-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+    .crop-manual-row .crop-box-readout {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--text-muted);
     }
   </style>
 </head>
@@ -1291,21 +1428,28 @@
         <em>Drop images</em> here, or <em>click to browse</em>
       </div>
       <div class="drop-formats">
-        JPEG · PNG · WebP · AVIF · GIF · HEIF/HEIC · TIFF · BMP · SVG · PSD
+        JPEG · PNG · WebP · AVIF · GIF · HEIF/HEIC · TIFF · BMP · SVG · PSD · PDF
       </div>
       <div class="drop-privacy">
         Everything stays on your machine.
       </div>
     </div>
     <input type="file" id="file-input" multiple
-      accept=".jpg,.jpeg,.png,.webp,.avif,.gif,.heic,.heif,.heics,.heifs,.tif,.tiff,.bmp,.svg,.psd,image/*" />
+      accept=".jpg,.jpeg,.png,.webp,.avif,.gif,.heic,.heif,.heics,.heifs,.tif,.tiff,.bmp,.svg,.psd,.pdf,application/pdf,image/*" />
   </section>
 
   <!-- Format + Options ------------------------------------------------- -->
   <section class="section">
     <div class="section-header-row">
       <div class="section-label">Convert to</div>
-      <button type="button" class="btn btn-ghost btn-sm" id="apply-to-all-btn" hidden>Apply to all</button>
+      <div class="preset-bar">
+        <select id="preset-select" aria-label="Settings presets" style="width:auto; min-width:130px;">
+          <option value="">Presets…</option>
+        </select>
+        <button type="button" class="btn btn-ghost btn-sm" id="preset-save">Save…</button>
+        <button type="button" class="btn btn-ghost btn-sm" id="preset-delete" hidden>Delete</button>
+        <button type="button" class="btn btn-ghost btn-sm" id="apply-to-all-btn" hidden>Apply to all</button>
+      </div>
     </div>
 
     <div class="format-bar">
@@ -1353,6 +1497,18 @@
         </select>
       </div>
     </div>
+
+    <!-- PDF-specific control: shown only when a PDF file is in the list -->
+    <div id="pdf-page-group" style="display:none; margin-top:14px;">
+      <div class="control-group" style="max-width:280px;">
+        <label class="field-label" for="pdf-page">PDF page to convert<span id="pdf-page-count"></span></label>
+        <input type="number" id="pdf-page" min="1" value="1" />
+        <div class="checkbox-row no-pad" style="margin-top:8px;">
+          <input type="checkbox" id="pdf-all-pages" />
+          <label for="pdf-all-pages">Convert all pages</label>
+        </div>
+      </div>
+    </div>
   </section>
 
   <!-- Privacy / metadata ----------------------------------------------- -->
@@ -1391,94 +1547,10 @@
       <button class="btn btn-ghost btn-sm" id="transforms-reset" type="button" hidden>Reset</button>
     </div>
 
-    <div class="transforms-body" id="transforms-body" hidden>
-
-      <!-- Resize -->
-      <div class="transforms-row">
-        <div class="field-label">Resize</div>
-        <div class="transforms-segmented" id="resize-mode-buttons" role="radiogroup" aria-label="Resize mode">
-          <button class="transforms-seg-btn active" data-mode="none" type="button" role="radio" aria-checked="true">None</button>
-          <button class="transforms-seg-btn" data-mode="max" type="button" role="radio">Max dim</button>
-          <button class="transforms-seg-btn" data-mode="percentage" type="button" role="radio">Percentage</button>
-          <button class="transforms-seg-btn" data-mode="exact" type="button" role="radio">Exact</button>
-        </div>
-        <div class="resize-inputs" id="resize-inputs-max" hidden>
-          <input type="number" id="resize-max-w" min="1" placeholder="W" />
-          <span class="resize-sep">×</span>
-          <input type="number" id="resize-max-h" min="1" placeholder="H" />
-          <span class="resize-unit">px (bound the long edge)</span>
-        </div>
-        <div class="resize-inputs" id="resize-inputs-percentage" hidden>
-          <input type="number" id="resize-pct" min="1" max="1000" value="100" />
-          <span class="resize-unit">%</span>
-        </div>
-        <div class="resize-inputs" id="resize-inputs-exact" hidden>
-          <input type="number" id="resize-exact-w" min="1" placeholder="W" />
-          <span class="resize-sep">×</span>
-          <input type="number" id="resize-exact-h" min="1" placeholder="H" />
-          <span class="resize-unit">px (will crop to match)</span>
-        </div>
-        <div class="checkbox-row no-pad resize-upscale-row" id="resize-upscale-row" hidden>
-          <input type="checkbox" id="resize-upscale" />
-          <label for="resize-upscale">Allow upscale (default off)</label>
-        </div>
-        <div class="resize-preview" id="resize-preview" hidden></div>
-      </div>
-
-      <!-- Rotate / flip -->
-      <div class="transforms-row">
-        <div class="field-label">Rotate &amp; flip</div>
-        <div class="transforms-segmented" id="rotate-buttons" role="radiogroup" aria-label="Rotation">
-          <button class="transforms-seg-btn active" data-rotate="0" type="button" role="radio" aria-checked="true">0°</button>
-          <button class="transforms-seg-btn" data-rotate="90" type="button" role="radio">90°</button>
-          <button class="transforms-seg-btn" data-rotate="180" type="button" role="radio">180°</button>
-          <button class="transforms-seg-btn" data-rotate="270" type="button" role="radio">270°</button>
-        </div>
-        <div class="flip-row">
-          <div class="checkbox-row no-pad">
-            <input type="checkbox" id="flip-horizontal" />
-            <label for="flip-horizontal">Flip horizontal</label>
-          </div>
-          <div class="checkbox-row no-pad">
-            <input type="checkbox" id="flip-vertical" />
-            <label for="flip-vertical">Flip vertical</label>
-          </div>
-        </div>
-      </div>
-
-      <!-- Crop -->
-      <div class="transforms-row">
-        <div class="field-label">Crop to aspect</div>
-        <div class="transforms-aspect-row">
-          <select id="crop-aspect">
-            <option value="none" selected>None</option>
-            <option value="1:1">1:1 (square)</option>
-            <option value="4:3">4:3</option>
-            <option value="3:2">3:2</option>
-            <option value="16:9">16:9</option>
-            <option value="custom">Custom…</option>
-          </select>
-          <div class="crop-custom-inputs" id="crop-custom-inputs" hidden>
-            <input type="number" id="crop-custom-w" min="1" placeholder="W" />
-            <span class="resize-sep">:</span>
-            <input type="number" id="crop-custom-h" min="1" placeholder="H" />
-          </div>
-        </div>
-      </div>
-
-      <!-- Resample kernel -->
-      <div class="transforms-row">
-        <div class="field-label">Resample kernel</div>
-        <select id="resample-kernel" disabled>
-          <option value="lanczos3" selected>Lanczos 3 (default)</option>
-          <option value="lanczos2">Lanczos 2</option>
-          <option value="mitchell">Mitchell</option>
-          <option value="cubic">Cubic</option>
-          <option value="nearest">Nearest (sharp pixels)</option>
-        </select>
-      </div>
-
-    </div>
+    <!-- Body is built by buildTransformsPanel() against the global
+         transformsState; the per-file drawer builds the same panel against
+         a file's override.transforms. -->
+    <div class="transforms-body" id="transforms-body" hidden></div>
   </section>
 
   <!-- Output folder ---------------------------------------------------- -->
@@ -1488,6 +1560,22 @@
       <code id="output-folder-path" title="">…</code>
       <button class="btn btn-secondary btn-sm" id="open-folder-btn" style="display:none;">Open folder</button>
       <button class="btn btn-secondary btn-sm" id="change-folder-btn" style="display:none;">Change…</button>
+    </div>
+    <div class="output-row" style="margin-top:10px;">
+      <span class="output-label">Filename</span>
+      <input type="text" id="filename-template" placeholder="{name}" spellcheck="false"
+        style="flex:1; min-width:200px; font-family:var(--font-mono); font-size:11.5px;"
+        aria-describedby="filename-template-hint" />
+    </div>
+    <div id="filename-template-hint" style="font-size:11px; color:var(--text-faint); margin-top:6px;">
+      Click to insert:
+      <button type="button" class="token-chip" data-token="{name}">{name}</button>
+      <button type="button" class="token-chip" data-token="{format}">{format}</button>
+      <button type="button" class="token-chip" data-token="{width}">{width}</button>
+      <button type="button" class="token-chip" data-token="{height}">{height}</button>
+      <button type="button" class="token-chip" data-token="{date}">{date}</button>
+      <button type="button" class="token-chip" data-token="{n}">{n}</button>
+      — leave empty for the original name
     </div>
   </section>
 
@@ -1525,7 +1613,7 @@
   </section>
 
   <footer class="app-footer">
-    LocalPix · v1.2.0 · offline image converter
+    LocalPix · v1.4.0 · offline image converter
   </footer>
 
 </div>
@@ -1629,6 +1717,7 @@
   function detectSourceKind(file) {
     const ext = ('.' + (file.name.split('.').pop() || '')).toLowerCase();
     const m = (file.type || '').toLowerCase();
+    if (ext === '.pdf' || m === 'application/pdf') return 'pdf';
     if (ext === '.psd' || m.includes('photoshop')) return 'psd';
     if (['.heic', '.heif', '.heics', '.heifs'].includes(ext) ||
         m.startsWith('image/heic') || m.startsWith('image/heif')) return 'heif';
@@ -1682,6 +1771,79 @@
   const fileCount          = document.getElementById('file-count');
   const svgDensityGroup    = document.getElementById('svg-density-group');
   const svgDensity         = document.getElementById('svg-density');
+  const pdfPageGroup       = document.getElementById('pdf-page-group');
+  const pdfPageInput       = document.getElementById('pdf-page');
+  const pdfPageCountEl     = document.getElementById('pdf-page-count');
+  const pdfAllPages        = document.getElementById('pdf-all-pages');
+
+  // Probe a PDF's page count via /api/pdf-info so the page picker can be
+  // capped and "Convert all pages" knows how far to iterate. Non-fatal on
+  // failure — the server clamps out-of-range pages anyway.
+  async function probePdfInfo(id) {
+    const entry = files.get(id);
+    if (!entry || entry.kind !== 'pdf') return;
+    try {
+      const fd = new FormData();
+      fd.append('image', entry.file);
+      const resp = await fetch('/api/pdf-info', { method: 'POST', body: fd });
+      const data = await resp.json();
+      if (resp.ok && data.pageCount > 0) {
+        entry.pdfPages = data.pageCount;
+        refreshPdfControls();
+        refreshFileNotices();
+      }
+    } catch (e) { /* probe is best-effort */ }
+  }
+
+  // Cap the page input at the largest known page count and reflect the
+  // "all pages" checkbox state. Called from refresh() and probePdfInfo().
+  function refreshPdfControls() {
+    let maxPages = 0;
+    for (const e of files.values()) {
+      if (e.kind === 'pdf' && e.pdfPages) maxPages = Math.max(maxPages, e.pdfPages);
+    }
+    if (maxPages > 0) {
+      pdfPageInput.max = String(maxPages);
+      if (Number(pdfPageInput.value) > maxPages) pdfPageInput.value = String(maxPages);
+      pdfPageCountEl.textContent = ` (of ${maxPages})`;
+    } else {
+      pdfPageInput.removeAttribute('max');
+      pdfPageCountEl.textContent = '';
+    }
+    pdfPageInput.disabled = pdfAllPages.checked;
+  }
+  pdfAllPages.addEventListener('change', refreshPdfControls);
+  const filenameTemplateInput = document.getElementById('filename-template');
+
+  // Persist the filename template across sessions (web localStorage; the
+  // Electron app shares the same renderer storage).
+  try {
+    const savedTpl = localStorage.getItem('localpix-filename-template');
+    if (savedTpl) filenameTemplateInput.value = savedTpl;
+  } catch (e) { /* private mode etc. */ }
+  filenameTemplateInput.addEventListener('input', () => {
+    try {
+      const v = filenameTemplateInput.value.trim();
+      if (v) localStorage.setItem('localpix-filename-template', v);
+      else localStorage.removeItem('localpix-filename-template');
+    } catch (e) { /* private mode etc. */ }
+  });
+
+  // Token chips insert at the caret (replacing any selection) and re-focus
+  // the field so several tokens can be clicked in a row.
+  document.querySelectorAll('#filename-template-hint .token-chip').forEach((chip) => {
+    chip.addEventListener('click', () => {
+      const token = chip.dataset.token;
+      const input = filenameTemplateInput;
+      const start = input.selectionStart ?? input.value.length;
+      const end = input.selectionEnd ?? start;
+      input.value = input.value.slice(0, start) + token + input.value.slice(end);
+      const caret = start + token.length;
+      input.focus();
+      input.setSelectionRange(caret, caret);
+      input.dispatchEvent(new Event('input')); // persist via the handler above
+    });
+  });
 
   // --- Format selector ------------------------------------------------------
   function setTargetFormat(fmt) {
@@ -1966,6 +2128,7 @@
       files.set(id, { file, kind, rowEl, state: 'pending', naturalW: 0, naturalH: 0, override: null });
       fileList.appendChild(rowEl);
       generateThumb(id, file, kind);
+      if (kind === 'pdf') probePdfInfo(id);
     }
     refresh();
   }
@@ -2031,8 +2194,9 @@
     if (!entry) return;
     const wrap = entry.rowEl.querySelector('.thumb-wrap');
 
-    // Browsers can't render PSD / HEIF natively → show a labelled placeholder.
-    const browserSupportsThumb = !['psd', 'heif', 'tiff', 'bmp'].includes(kind);
+    // Browsers can't render PSD / HEIF / PDF natively in an <img> → show a
+    // labelled placeholder.
+    const browserSupportsThumb = !['psd', 'heif', 'tiff', 'bmp', 'pdf'].includes(kind);
     if (!browserSupportsThumb) {
       const placeholder = document.createElement('div');
       placeholder.className = 'thumb-placeholder';
@@ -2080,6 +2244,9 @@
       if (kind === 'heif') {
         notices.push('HEIF/HEIC input: decoded locally; no HEIC encoder is shipped (use AVIF for similar compression).');
       }
+      if (kind === 'pdf') {
+        notices.push('PDF input: a single page is rendered (choose it with “PDF page to convert” above).');
+      }
       if ((kind === 'gif' || kind === 'webp') && effective.targetFormat !== kind) {
         notices.push('Animated sources are flattened to the first frame in v1.');
       }
@@ -2113,7 +2280,9 @@
     if (s.rotate !== 0) parts.push('rotate ' + s.rotate + '°');
     if (s.flip.horizontal) parts.push('flip H');
     if (s.flip.vertical) parts.push('flip V');
-    if (s.crop.aspect !== 'none') {
+    if (s.crop.box && s.crop.box.width > 0) {
+      parts.push('crop ' + s.crop.box.width + '×' + s.crop.box.height + 'px');
+    } else if (s.crop.aspect !== 'none') {
       const label = s.crop.aspect === 'custom'
         ? (s.crop.customW && s.crop.customH ? 'crop ' + s.crop.customW + ':' + s.crop.customH : '')
         : 'crop ' + s.crop.aspect;
@@ -2260,8 +2429,17 @@
     // Initial options render
     rebuildOpts();
 
-    // -- Transforms snapshot (read-only — per-file transforms editing in Phase 5)
-    const txDesc = describeActiveTransforms(override.transforms);
+    // -- Transforms: fully editable, bound to this file's override snapshot.
+    // Same renderer as the global section; preview pins to this file's dims.
+    const txPanel = el('div', { class: 'transforms-body' });
+    txPanel.hidden = false;
+    buildTransformsPanel(txPanel, override.transforms, {
+      onChange: () => {
+        refreshBadge();
+        refreshFileNotices();
+      },
+      previewEntry: entry,
+    });
 
     // -- Assemble
     drawer.appendChild(el('div', { class: 'file-drawer-section' },
@@ -2272,10 +2450,10 @@
       el('div', { class: 'file-drawer-label', text: 'Options' }),
       optsPanel,
     ));
-    if (txDesc) {
-      drawer.appendChild(el('div', { class: 'override-tx-summary',
-        text: 'Transforms at capture: ' + txDesc }));
-    }
+    drawer.appendChild(el('div', { class: 'file-drawer-section' },
+      el('div', { class: 'file-drawer-label', text: 'Transforms' }),
+      txPanel,
+    ));
   }
 
   // Update the override status bar and row chrome to reflect whether the file
@@ -2315,6 +2493,67 @@
     if (!drawer.hidden) buildDrawerContent(id, entry, drawer);
   }
 
+  // Assemble the multipart payload for one /api/convert request. Optional
+  // overrides let the PDF "all pages" loop pin the page number and append a
+  // per-page suffix to the filename template.
+  function buildConvertFormData(entry, settings, { pdfPage, filenameTemplate } = {}) {
+    const formData = new FormData();
+    formData.append('image', entry.file);
+    formData.append('targetFormat', settings.targetFormat);
+    formData.append('options', JSON.stringify(settings.opts));
+    if (entry.kind === 'svg') {
+      formData.append('inputDensity', svgDensity.value);
+    }
+    if (entry.kind === 'pdf') {
+      formData.append('pdfPage', String(pdfPage ?? (pdfPageInput.value || '1')));
+    }
+    // Output filename template. Only sent when it deviates from the default
+    // so untouched conversions keep the minimal, byte-identical request shape.
+    const fnTemplate = filenameTemplate !== undefined
+      ? filenameTemplate
+      : filenameTemplateInput.value.trim();
+    if (fnTemplate && fnTemplate !== '{name}') {
+      formData.append('filenameTemplate', fnTemplate);
+    }
+    // Metadata toggles. Only send when they deviate from defaults so the
+    // server keeps its byte-identical no-op default behavior when both are
+    // at the stock values. (Privacy toggles stay global.)
+    const stripEl = document.getElementById('strip-metadata');
+    const preserveEl = document.getElementById('preserve-color-profile');
+    if (stripEl && !stripEl.checked) formData.append('stripMetadata', 'false');
+    if (preserveEl && preserveEl.checked) formData.append('preserveColorProfile', 'true');
+
+    // Cross-cutting transforms (resize, rotate, flip, crop, kernel) from the
+    // resolved settings — per-file override or global default.
+    if (settings.transformsPayload) {
+      formData.append('transforms', JSON.stringify(settings.transformsPayload));
+    }
+    return formData;
+  }
+
+  async function postConvert(formData) {
+    const resp = await fetch('/api/convert', { method: 'POST', body: formData });
+    const data = await resp.json();
+    if (!resp.ok) throw new Error(data.error || 'Conversion failed');
+    return data;
+  }
+
+  function downloadLinkFor(data, label) {
+    const downloadIcon = svgEl('svg',
+      { viewBox: '0 0 16 16', fill: 'none', stroke: 'currentColor',
+        'stroke-width': 1.8, 'stroke-linecap': 'round', 'stroke-linejoin': 'round' },
+      svgEl('path', { d: 'M8 2v9M4 7l4 4 4-4M3 13h10' }),
+    );
+    return el('a',
+      { class: 'download-link',
+        href: '/api/download/' + encodeURIComponent(data.convertedName),
+        download: data.convertedName,
+        title: data.convertedName },
+      downloadIcon,
+      ' ' + label,
+    );
+  }
+
   async function convertFile(id) {
     const entry = files.get(id);
     if (!entry || entry.state === 'converting') return;
@@ -2328,71 +2567,69 @@
 
     const settings = getEffectiveSettings(entry);
 
-    const formData = new FormData();
-    formData.append('image', entry.file);
-    formData.append('targetFormat', settings.targetFormat);
-    formData.append('options', JSON.stringify(settings.opts));
-    if (entry.kind === 'svg') {
-      formData.append('inputDensity', svgDensity.value);
-    }
-    // Metadata toggles. Only send when they deviate from defaults so the
-    // server keeps its byte-identical no-op default behavior when both are
-    // at the stock values. (Privacy toggles stay global in v1.3.)
-    const stripEl = document.getElementById('strip-metadata');
-    const preserveEl = document.getElementById('preserve-color-profile');
-    if (stripEl && !stripEl.checked) formData.append('stripMetadata', 'false');
-    if (preserveEl && preserveEl.checked) formData.append('preserveColorProfile', 'true');
-
-    // Cross-cutting transforms (resize, rotate, flip, crop, kernel) from the
-    // resolved settings — per-file override or global default.
-    if (settings.transformsPayload) {
-      formData.append('transforms', JSON.stringify(settings.transformsPayload));
-    }
-
     try {
-      const resp = await fetch('/api/convert', { method: 'POST', body: formData });
-      const data = await resp.json();
-      if (!resp.ok) throw new Error(data.error || 'Conversion failed');
+      // "Convert all pages" for PDFs: one request per page. The filename
+      // template (or its {name} default) gets a -p<N> suffix per page so
+      // the outputs sort together instead of colliding into timestamps.
+      const allPages = entry.kind === 'pdf' && pdfAllPages.checked && (entry.pdfPages || 0) > 1;
+      let results;
+      if (allPages) {
+        const userTpl = filenameTemplateInput.value.trim() || '{name}';
+        results = [];
+        for (let pageN = 1; pageN <= entry.pdfPages; pageN++) {
+          results.push(await postConvert(buildConvertFormData(entry, settings, {
+            pdfPage: pageN,
+            filenameTemplate: `${userTpl}-p${pageN}`,
+          })));
+        }
+      } else {
+        results = [await postConvert(buildConvertFormData(entry, settings))];
+      }
 
       entry.state = 'done';
-      entry.convertedName = data.convertedName;
-      entry.convertedSize = data.convertedSize;
+      entry.convertedName = results[0].convertedName;
+      const totalSize = results.reduce((s, d) => s + d.convertedSize, 0);
+      entry.convertedSize = totalSize;
       row.className = 'file-row done';
 
-      const savings = data.originalSize - data.convertedSize;
-      const pct = data.originalSize > 0
-        ? Math.round((savings / data.originalSize) * 100)
-        : 0;
-      const savingsNode = savings > 0
-        ? el('span', { class: 'savings', text: '↓ ' + pct + '% saved' })
-        : el('span',
-            { style: { color: 'var(--text-muted)' },
-              text: pct === 0 ? 'same size' : '↑ larger' });
+      if (results.length > 1) {
+        row.querySelector('.result-info').replaceChildren(
+          el('span', { class: 'arrow', text: '→' }),
+          ` ${results.length} pages `,
+          el('span', { class: 'sep', text: '·' }),
+          ' ' + formatSize(totalSize),
+        );
+        row.querySelector('.download-wrap').replaceChildren(
+          ...results.map((d, i) => downloadLinkFor(d, 'p' + (i + 1))),
+        );
+        row.querySelector('.download-wrap').style.display = 'inline-flex';
+        row.querySelector('.download-wrap').style.flexWrap = 'wrap';
+        row.querySelector('.download-wrap').style.gap = '4px';
+      } else {
+        const data = results[0];
+        const savings = data.originalSize - data.convertedSize;
+        const pct = data.originalSize > 0
+          ? Math.round((savings / data.originalSize) * 100)
+          : 0;
+        const savingsNode = savings > 0
+          ? el('span', { class: 'savings', text: '↓ ' + pct + '% saved' })
+          : el('span',
+              { style: { color: 'var(--text-muted)' },
+                text: pct === 0 ? 'same size' : '↑ larger' });
 
-      row.querySelector('.result-info').replaceChildren(
-        el('span', { class: 'arrow', text: '→' }),
-        ' ',
-        formatSize(data.convertedSize),
-        ' ',
-        el('span', { class: 'sep', text: '·' }),
-        ' ',
-        savingsNode,
-      );
-
-      const downloadIcon = svgEl('svg',
-        { viewBox: '0 0 16 16', fill: 'none', stroke: 'currentColor',
-          'stroke-width': 1.8, 'stroke-linecap': 'round', 'stroke-linejoin': 'round' },
-        svgEl('path', { d: 'M8 2v9M4 7l4 4 4-4M3 13h10' }),
-      );
-      row.querySelector('.download-wrap').replaceChildren(
-        el('a',
-          { class: 'download-link',
-            href: '/api/download/' + encodeURIComponent(data.convertedName),
-            download: data.convertedName },
-          downloadIcon,
-          ' Save',
-        ),
-      );
+        row.querySelector('.result-info').replaceChildren(
+          el('span', { class: 'arrow', text: '→' }),
+          ' ',
+          formatSize(data.convertedSize),
+          ' ',
+          el('span', { class: 'sep', text: '·' }),
+          ' ',
+          savingsNode,
+        );
+        row.querySelector('.download-wrap').replaceChildren(
+          downloadLinkFor(data, 'Save'),
+        );
+      }
 
       convertBtn.textContent = 'Reconvert';
       convertBtn.disabled = false;
@@ -2509,6 +2746,11 @@
     // SVG density only visible when an SVG file is in the list.
     const hasSvg = [...files.values()].some((e) => e.kind === 'svg');
     svgDensityGroup.style.display = hasSvg ? '' : 'none';
+
+    // PDF page picker only visible when a PDF file is in the list.
+    const hasPdf = [...files.values()].some((e) => e.kind === 'pdf');
+    pdfPageGroup.style.display = hasPdf ? '' : 'none';
+    if (hasPdf) refreshPdfControls();
 
     // "Apply to all" only meaningful when there are files to apply to.
     applyToAllBtn.hidden = count === 0;
@@ -2660,6 +2902,128 @@
     syncPreserveEnabled();
   })();
 
+  // Minimal text-input dialog. Electron's renderer does NOT implement
+  // window.prompt() (Chromium drops it there), so preset naming uses this
+  // DOM-built modal instead. Resolves with the entered string, or null on
+  // cancel/Escape/backdrop click.
+  function promptForText({ title, initial = '', confirmLabel = 'Save' }) {
+    return new Promise((resolve) => {
+      const input = el('input', { type: 'text', value: initial, spellcheck: 'false' });
+      const okBtn = el('button', { type: 'button', class: 'btn btn-primary btn-sm', text: confirmLabel });
+      const cancelBtn = el('button', { type: 'button', class: 'btn btn-ghost btn-sm', text: 'Cancel' });
+      const modal = el('div',
+        { class: 'crop-modal', role: 'dialog', 'aria-label': title, style: { minWidth: '280px' } },
+        el('label', { class: 'field-label', text: title }),
+        input,
+        el('div', { class: 'crop-modal-footer' }, cancelBtn, okBtn),
+      );
+      const backdrop = el('div', { class: 'crop-backdrop' }, modal);
+
+      function done(value) {
+        document.removeEventListener('keydown', onKey);
+        backdrop.remove();
+        resolve(value);
+      }
+      function onKey(e) {
+        if (e.key === 'Escape') done(null);
+        else if (e.key === 'Enter' && document.activeElement === input) done(input.value);
+      }
+      document.addEventListener('keydown', onKey);
+      okBtn.addEventListener('click', () => done(input.value));
+      cancelBtn.addEventListener('click', () => done(null));
+      backdrop.addEventListener('pointerdown', (e) => {
+        if (e.target === backdrop) done(null);
+      });
+
+      document.body.appendChild(backdrop);
+      input.focus();
+      input.select();
+    });
+  }
+
+  // -- Settings presets -------------------------------------------------------
+  // Named snapshots of the global settings (target + opts + transforms) —
+  // the same shape per-file overrides use (snapshotGlobalSettings()).
+  // Persistence: Electron stores them in userData/config.json over IPC
+  // (mirroring output-folder persistence); web mode falls back to
+  // localStorage.
+  (function initPresets() {
+    const sel = document.getElementById('preset-select');
+    const saveBtn = document.getElementById('preset-save');
+    const deleteBtn = document.getElementById('preset-delete');
+
+    const store = {
+      async load() {
+        if (window.localpix && window.localpix.getPresets) {
+          try { return (await window.localpix.getPresets()) || {}; } catch (e) { return {}; }
+        }
+        try { return JSON.parse(localStorage.getItem('localpix-presets')) || {}; } catch (e) { return {}; }
+      },
+      async save(presets) {
+        if (window.localpix && window.localpix.setPresets) {
+          try { await window.localpix.setPresets(presets); return; } catch (e) { /* fall back below */ }
+        }
+        try { localStorage.setItem('localpix-presets', JSON.stringify(presets)); } catch (e) { /* private mode */ }
+      },
+    };
+
+    let presets = {};
+
+    function rebuildDropdown(selected) {
+      sel.replaceChildren(el('option', { value: '', text: 'Presets…' }));
+      for (const name of Object.keys(presets).sort((a, b) => a.localeCompare(b))) {
+        sel.appendChild(el('option', { value: name, text: name }));
+      }
+      sel.value = selected && presets[selected] ? selected : '';
+      deleteBtn.hidden = !sel.value;
+    }
+
+    function applyPreset(p) {
+      if (!p || !FORMAT_OPTIONS[p.target]) return;
+      setTargetFormat(p.target); // resets currentOpts to format defaults
+      // Layer the preset's opts over fresh defaults so presets saved by a
+      // version with different fields still produce a complete opts object.
+      currentOpts = { ...defaultsFor(p.target), ...JSON.parse(JSON.stringify(p.opts || {})) };
+      if (typeof currentOpts.background === 'string') {
+        currentBackground = currentOpts.background;
+      }
+      renderOptions();
+      const tx = { ...TRANSFORMS_DEFAULTS(), ...JSON.parse(JSON.stringify(p.transforms || {})) };
+      setGlobalTransformsState(tx);
+      refreshFileNotices();
+    }
+
+    sel.addEventListener('change', () => {
+      deleteBtn.hidden = !sel.value;
+      if (sel.value && presets[sel.value]) applyPreset(presets[sel.value]);
+    });
+
+    saveBtn.addEventListener('click', async () => {
+      // window.prompt doesn't exist in Electron — use the in-app dialog.
+      const raw = await promptForText({ title: 'Preset name', initial: sel.value || '' });
+      const name = (raw || '').trim();
+      if (!name) return;
+      if (presets[name] && !window.confirm(`Replace existing preset "${name}"?`)) return;
+      presets[name] = snapshotGlobalSettings();
+      await store.save(presets);
+      rebuildDropdown(name);
+    });
+
+    deleteBtn.addEventListener('click', async () => {
+      const name = sel.value;
+      if (!name || !presets[name]) return;
+      if (!window.confirm(`Delete preset "${name}"?`)) return;
+      delete presets[name];
+      await store.save(presets);
+      rebuildDropdown('');
+    });
+
+    store.load().then((p) => {
+      presets = (p && typeof p === 'object' && !Array.isArray(p)) ? p : {};
+      rebuildDropdown('');
+    });
+  })();
+
   // -- Transforms (resize, rotate, flip, crop, kernel) ----------------------
   // Single source of truth for the section's state. Parallel to currentOpts
   // (per-format options) and the metadata toggles. Serialized into the
@@ -2668,7 +3032,10 @@
     resize: { mode: 'none', width: 0, height: 0, percentage: 100, upscale: false },
     rotate: 0,
     flip: { horizontal: false, vertical: false },
-    crop: { aspect: 'none', customW: 0, customH: 0 },
+    // box: explicit pixel crop from the manual overlay — { left, top, width,
+    // height } in original source pixels, or null. Per-file only (set via
+    // the drawer); when present it wins over the aspect crop.
+    crop: { aspect: 'none', customW: 0, customH: 0, box: null },
     kernel: 'lanczos3',
   });
   let transformsState = TRANSFORMS_DEFAULTS();
@@ -2694,7 +3061,10 @@
     if (s.flip.horizontal || s.flip.vertical) {
       out.flip = { horizontal: !!s.flip.horizontal, vertical: !!s.flip.vertical };
     }
-    if (s.crop.aspect !== 'none') {
+    if (s.crop.box && s.crop.box.width > 0 && s.crop.box.height > 0) {
+      const b = s.crop.box;
+      out.crop = { box: { left: b.left, top: b.top, width: b.width, height: b.height } };
+    } else if (s.crop.aspect !== 'none') {
       out.crop = { aspect: s.crop.aspect };
       if (s.crop.aspect === 'custom') {
         out.crop.customW = s.crop.customW;
@@ -2706,34 +3076,46 @@
   }
 
   // Count how many transform categories are non-default. Drives the badge.
-  function countActiveTransforms() {
-    const s = transformsState;
+  // Accepts an optional state object; defaults to the global transformsState.
+  function countActiveTransforms(state) {
+    const s = state || transformsState;
     let n = 0;
     if (s.resize.mode !== 'none') n++;
     if (s.rotate !== 0) n++;
     if (s.flip.horizontal || s.flip.vertical) n++;
-    if (s.crop.aspect !== 'none') n++;
+    if (s.crop.aspect !== 'none' || (s.crop.box && s.crop.box.width > 0)) n++;
     return n;
   }
 
-  // Compute the resulting dimensions for the first file in the list, applying
-  // the same ordered transforms the server does. Returns a string like
-  // "320×240" or null when no preview is meaningful.
-  function computeResizePreview() {
-    if (transformsState.resize.mode === 'none') return null;
-    const first = [...files.values()].find((e) => e.naturalW && e.naturalH);
-    if (!first) return null;
+  // Compute the resulting dimensions after the ordered transforms the server
+  // applies. Previews from `entry` when given (per-file drawer), otherwise
+  // from the first file in the list with known dimensions (global panel).
+  // Returns a string like "320×240" or null when no preview is meaningful.
+  function computeResizePreview(state, entry) {
+    const s = state || transformsState;
+    if (s.resize.mode === 'none') return null;
+    const src = entry && entry.naturalW && entry.naturalH
+      ? entry
+      : [...files.values()].find((e) => e.naturalW && e.naturalH);
+    if (!src) return null;
 
-    let w = first.naturalW, h = first.naturalH;
+    let w = src.naturalW, h = src.naturalH;
+
+    // Explicit pixel crop happens before rotation (box is in source pixels)
+    const hasBox = s.crop.box && s.crop.box.width > 0 && s.crop.box.height > 0;
+    if (hasBox) {
+      w = Math.min(s.crop.box.width, Math.max(1, w - s.crop.box.left));
+      h = Math.min(s.crop.box.height, Math.max(1, h - s.crop.box.top));
+    }
 
     // Rotate
-    if (transformsState.rotate === 90 || transformsState.rotate === 270) {
+    if (s.rotate === 90 || s.rotate === 270) {
       [w, h] = [h, w];
     }
 
     // Crop
-    if (transformsState.crop.aspect !== 'none') {
-      const ratio = parseCropAspect(transformsState.crop);
+    if (!hasBox && s.crop.aspect !== 'none') {
+      const ratio = parseCropAspect(s.crop);
       if (ratio) {
         const srcAspect = w / h;
         const targetAspect = ratio[0] / ratio[1];
@@ -2745,7 +3127,7 @@
     }
 
     // Resize
-    const r = transformsState.resize;
+    const r = s.resize;
     if (r.mode === 'max') {
       const maxW = r.width || Infinity;
       const maxH = r.height || Infinity;
@@ -2780,32 +3162,485 @@
     }
   }
 
+  // -- Manual crop overlay -----------------------------------------------------
+  // Modal drag-to-crop editor. Displays the source image fit to the viewport
+  // and lets the user draw/move/resize a crop rectangle with corner + edge
+  // handles, optional aspect lock, and a live source-pixel readout.
+  //
+  // Coordinate model: the rectangle is tracked in DISPLAY pixels relative to
+  // the rendered <img>; scale = naturalWidth / displayWidth maps it to source
+  // pixels on apply. The box is stored in ORIGINAL source coordinates and the
+  // server applies it before rotate/flip, so what's drawn here is exactly the
+  // region kept regardless of other active transforms.
+  //
+  // Pointer Events (with capture) drive all interaction — mouse and touch
+  // share one code path; the stage sets touch-action:none so drags aren't
+  // hijacked for scrolling.
+  function openCropModal(entry, state, onDone) {
+    if (!entry || !entry.naturalW || !entry.naturalH) return;
+    const naturalW = entry.naturalW, naturalH = entry.naturalH;
+
+    const url = URL.createObjectURL(entry.file);
+    const img = el('img', { src: url, alt: 'Crop preview', draggable: false });
+
+    const HANDLES = ['nw', 'n', 'ne', 'e', 'se', 's', 'sw', 'w'];
+    const rect = el('div', { class: 'crop-rect' },
+      ...HANDLES.map((h) => el('div', { class: 'crop-handle', dataset: { h } })));
+    const stage = el('div', { class: 'crop-stage' }, img, rect);
+
+    const readout = el('span', { class: 'crop-readout', text: '' });
+    const aspectSel = el('select', { 'aria-label': 'Aspect lock' });
+    for (const [value, label] of [
+      ['free', 'Free'], ['1:1', '1:1'],
+      ['4:3', '4:3 (landscape)'], ['3:4', '3:4 (portrait)'],
+      ['3:2', '3:2 (landscape)'], ['2:3', '2:3 (portrait)'],
+      ['16:9', '16:9 (landscape)'], ['9:16', '9:16 (portrait)'],
+    ]) {
+      aspectSel.appendChild(el('option', { value, text: label }));
+    }
+
+    const applyBtn = el('button', { class: 'btn btn-primary btn-sm', type: 'button', text: 'Apply crop' });
+    const clearBtn = el('button', { class: 'btn btn-secondary btn-sm', type: 'button', text: 'Clear crop' });
+    const cancelBtn = el('button', { class: 'btn btn-ghost btn-sm', type: 'button', text: 'Cancel' });
+
+    const modal = el('div', { class: 'crop-modal', role: 'dialog', 'aria-label': 'Crop image' },
+      el('div', { class: 'crop-modal-bar' },
+        el('span', { class: 'field-label', text: 'Aspect lock', style: { marginBottom: '0' } }),
+        aspectSel,
+        readout,
+      ),
+      stage,
+      el('div', { class: 'crop-modal-footer' },
+        el('span', { class: 'crop-note',
+          text: 'Drag to select · crop applies before rotation/resize' }),
+        cancelBtn, clearBtn, applyBtn,
+      ),
+    );
+    const backdrop = el('div', { class: 'crop-backdrop' }, modal);
+
+    // --- Geometry state (display px, relative to the rendered image) -------
+    let dispW = 0, dispH = 0, scale = 1;
+    // r is the live crop rectangle in display px.
+    let r = { x: 0, y: 0, w: 0, h: 0 };
+    const MIN = 8; // px, display space
+
+    function lockRatio() {
+      const v = aspectSel.value;
+      if (v === 'free') return null;
+      const [a, b] = v.split(':').map(Number);
+      return a / b;
+    }
+
+    function toSource() {
+      return {
+        left: Math.max(0, Math.min(naturalW - 1, Math.round(r.x * scale))),
+        top: Math.max(0, Math.min(naturalH - 1, Math.round(r.y * scale))),
+        width: Math.max(1, Math.min(naturalW, Math.round(r.w * scale))),
+        height: Math.max(1, Math.min(naturalH, Math.round(r.h * scale))),
+      };
+    }
+
+    function renderRect() {
+      rect.style.left = r.x + 'px';
+      rect.style.top = r.y + 'px';
+      rect.style.width = r.w + 'px';
+      rect.style.height = r.h + 'px';
+      const s = toSource();
+      readout.textContent = `${s.width} × ${s.height} px  @ (${s.left}, ${s.top})`;
+      // Edge handles fight the aspect lock — corners only when locked.
+      const locked = !!lockRatio();
+      rect.querySelectorAll('.crop-handle').forEach((hEl) => {
+        hEl.hidden = locked && ['n', 's', 'e', 'w'].includes(hEl.dataset.h);
+      });
+    }
+
+    function setRect(x, y, w, h) {
+      r = {
+        x: Math.max(0, Math.min(x, dispW - MIN)),
+        y: Math.max(0, Math.min(y, dispH - MIN)),
+        w: 0, h: 0,
+      };
+      r.w = Math.max(MIN, Math.min(w, dispW - r.x));
+      r.h = Math.max(MIN, Math.min(h, dispH - r.y));
+      renderRect();
+    }
+
+    // Build a rect from a fixed anchor to the pointer, honoring aspect lock
+    // and image bounds. Used for fresh drags and corner resizes.
+    function rectFromAnchor(ax, ay, px, py) {
+      const ratio = lockRatio();
+      px = Math.max(0, Math.min(px, dispW));
+      py = Math.max(0, Math.min(py, dispH));
+      let w = Math.abs(px - ax), h = Math.abs(py - ay);
+      const availW = px >= ax ? dispW - ax : ax;
+      const availH = py >= ay ? dispH - ay : ay;
+      if (ratio) {
+        w = Math.min(Math.max(w, h * ratio), availW, availH * ratio);
+        h = w / ratio;
+      } else {
+        w = Math.min(w, availW);
+        h = Math.min(h, availH);
+      }
+      const x = px >= ax ? ax : ax - w;
+      const y = py >= ay ? ay : ay - h;
+      setRect(x, y, w, h);
+    }
+
+    // --- Pointer interaction ----------------------------------------------
+    // drag.mode: 'new' (fresh selection), 'move', or a handle name.
+    let drag = null;
+
+    function stagePoint(e) {
+      const b = img.getBoundingClientRect();
+      return { x: e.clientX - b.left, y: e.clientY - b.top };
+    }
+
+    stage.addEventListener('pointerdown', (e) => {
+      if (e.button !== undefined && e.button !== 0) return;
+      e.preventDefault();
+      const p = stagePoint(e);
+      const handle = e.target.closest('.crop-handle');
+      if (handle) {
+        const h = handle.dataset.h;
+        // Anchor = the corner/edge opposite the grabbed handle.
+        const anchor = {
+          nw: { x: r.x + r.w, y: r.y + r.h }, se: { x: r.x, y: r.y },
+          ne: { x: r.x, y: r.y + r.h },       sw: { x: r.x + r.w, y: r.y },
+          n: { y: r.y + r.h }, s: { y: r.y }, w: { x: r.x + r.w }, e: { x: r.x },
+        }[h];
+        drag = { mode: h, anchor, r0: { ...r } };
+      } else if (e.target === rect || rect.contains(e.target)) {
+        drag = { mode: 'move', start: p, r0: { ...r } };
+      } else {
+        drag = { mode: 'new', anchor: { x: p.x, y: p.y } };
+        rectFromAnchor(p.x, p.y, p.x, p.y);
+      }
+      try { stage.setPointerCapture(e.pointerId); } catch (err) { /* synthetic events */ }
+    });
+
+    stage.addEventListener('pointermove', (e) => {
+      if (!drag) return;
+      const p = stagePoint(e);
+      const m = drag.mode;
+      if (m === 'move') {
+        const dx = p.x - drag.start.x, dy = p.y - drag.start.y;
+        setRect(
+          Math.max(0, Math.min(drag.r0.x + dx, dispW - drag.r0.w)),
+          Math.max(0, Math.min(drag.r0.y + dy, dispH - drag.r0.h)),
+          drag.r0.w, drag.r0.h,
+        );
+      } else if (m === 'new' || ['nw', 'ne', 'sw', 'se'].includes(m)) {
+        rectFromAnchor(drag.anchor.x, drag.anchor.y, p.x, p.y);
+      } else if (m === 'e' || m === 'w') {
+        const ax = drag.anchor.x;
+        const px = Math.max(0, Math.min(p.x, dispW));
+        const w = Math.abs(px - ax);
+        setRect(Math.min(ax, px), drag.r0.y, w, drag.r0.h);
+      } else if (m === 'n' || m === 's') {
+        const ay = drag.anchor.y;
+        const py = Math.max(0, Math.min(p.y, dispH));
+        const h = Math.abs(py - ay);
+        setRect(drag.r0.x, Math.min(ay, py), drag.r0.w, h);
+      }
+    });
+
+    const endDrag = () => { drag = null; };
+    stage.addEventListener('pointerup', endDrag);
+    stage.addEventListener('pointercancel', endDrag);
+
+    // Re-lock the current rect when the user picks an aspect (keep the
+    // center, fit the largest locked rect inside the current one).
+    aspectSel.addEventListener('change', () => {
+      const ratio = lockRatio();
+      if (ratio) {
+        const cx = r.x + r.w / 2, cy = r.y + r.h / 2;
+        let w = r.w, h = w / ratio;
+        if (h > r.h) { h = r.h; w = h * ratio; }
+        setRect(cx - w / 2, cy - h / 2, w, h);
+      }
+      renderRect();
+    });
+
+    // --- Lifecycle ----------------------------------------------------------
+    function close() {
+      URL.revokeObjectURL(url);
+      document.removeEventListener('keydown', onKey);
+      backdrop.remove();
+    }
+    function onKey(e) {
+      if (e.key === 'Escape') close();
+    }
+    document.addEventListener('keydown', onKey);
+    backdrop.addEventListener('pointerdown', (e) => {
+      if (e.target === backdrop) close();
+    });
+    cancelBtn.addEventListener('click', close);
+
+    applyBtn.addEventListener('click', () => {
+      state.crop.box = toSource();
+      state.crop.aspect = 'none'; // box wins; avoid double-crop confusion
+      close();
+      onDone();
+    });
+    clearBtn.addEventListener('click', () => {
+      state.crop.box = null;
+      close();
+      onDone();
+    });
+
+    img.addEventListener('load', () => {
+      dispW = img.clientWidth;
+      dispH = img.clientHeight;
+      scale = naturalW / dispW;
+      const b = state.crop.box;
+      if (b && b.width > 0) {
+        // Existing box → display coords
+        setRect(b.left / scale, b.top / scale, b.width / scale, b.height / scale);
+      } else {
+        // Default: centered 80% selection
+        setRect(dispW * 0.1, dispH * 0.1, dispW * 0.8, dispH * 0.8);
+      }
+    });
+    img.addEventListener('error', () => {
+      close();
+      alert('Could not load a preview of this image for cropping.');
+    });
+
+    document.body.appendChild(backdrop);
+  }
+
+  // Build the full transforms control set (resize, rotate/flip, crop, kernel)
+  // into `container`, bound to an arbitrary transformsState-shaped object.
+  // The generalization mirrors buildOptionsPanel/renderField: the global
+  // section renders against transformsState; the per-file drawer renders the
+  // same panel against entry.override.transforms.
+  //
+  // Controls mutate `state` directly. Visibility that depends on state (which
+  // resize inputs show, custom-crop inputs, kernel enablement) is handled by
+  // a closure-local sync() — no full re-render on input, so number fields
+  // keep focus while typing. `onChange()` fires after every mutation;
+  // `previewEntry` pins the dimension preview to one file (drawer) instead of
+  // the first file in the list (global).
+  //
+  // Returns { sync } so the host can refresh the panel's derived bits
+  // (preview text) when external state changes — e.g. files added.
+  function buildTransformsPanel(container, state, { onChange = () => {}, previewEntry = null } = {}) {
+    container.replaceChildren();
+
+    function changed() {
+      sync();
+      onChange();
+    }
+
+    // -- Segmented radio-row helper
+    function segmentedRow(ariaLabel, items, isActive, onPick) {
+      const row = el('div', { class: 'transforms-segmented', role: 'radiogroup', 'aria-label': ariaLabel });
+      const btns = items.map(({ label, value }) => {
+        const b = el('button', {
+          type: 'button', class: 'transforms-seg-btn', role: 'radio',
+          text: label,
+          onclick: () => { onPick(value); syncActive(); changed(); },
+        });
+        b._value = value;
+        return b;
+      });
+      function syncActive() {
+        for (const b of btns) {
+          const active = isActive(b._value);
+          b.classList.toggle('active', active);
+          b.setAttribute('aria-checked', String(active));
+        }
+      }
+      syncActive();
+      row.append(...btns);
+      row._syncActive = syncActive;
+      return row;
+    }
+
+    function checkboxRow(label, getChecked, onToggle) {
+      const cbId = 'tx-cb-' + (++fieldIdCounter);
+      const cb = el('input', {
+        type: 'checkbox', id: cbId, checked: getChecked(),
+        onchange: () => { onToggle(cb.checked); changed(); },
+      });
+      const row = el('div', { class: 'checkbox-row no-pad' },
+        cb, el('label', { for: cbId, text: label }));
+      row._cb = cb;
+      return row;
+    }
+
+    function numInput(attrs, getValue, onInput) {
+      const input = el('input', {
+        type: 'number', ...attrs,
+        oninput: () => { onInput(Number(input.value) || 0); changed(); },
+      });
+      const v = getValue();
+      if (v) input.value = v;
+      return input;
+    }
+
+    // -- Resize row
+    const resizeSeg = segmentedRow('Resize mode', [
+      { label: 'None', value: 'none' },
+      { label: 'Max dim', value: 'max' },
+      { label: 'Percentage', value: 'percentage' },
+      { label: 'Exact', value: 'exact' },
+    ], (v) => state.resize.mode === v, (v) => { state.resize.mode = v; });
+
+    const maxW = numInput({ min: 1, placeholder: 'W' }, () => state.resize.width, (v) => { state.resize.width = v; });
+    const maxH = numInput({ min: 1, placeholder: 'H' }, () => state.resize.height, (v) => { state.resize.height = v; });
+    const maxBox = el('div', { class: 'resize-inputs' },
+      maxW, el('span', { class: 'resize-sep', text: '×' }), maxH,
+      el('span', { class: 'resize-unit', text: 'px (bound the long edge)' }));
+
+    const pctInput = numInput({ min: 1, max: 1000 }, () => state.resize.percentage, (v) => { state.resize.percentage = v || 100; });
+    if (!pctInput.value) pctInput.value = state.resize.percentage || 100;
+    const pctBox = el('div', { class: 'resize-inputs' },
+      pctInput, el('span', { class: 'resize-unit', text: '%' }));
+
+    const exactW = numInput({ min: 1, placeholder: 'W' }, () => state.resize.width, (v) => { state.resize.width = v; });
+    const exactH = numInput({ min: 1, placeholder: 'H' }, () => state.resize.height, (v) => { state.resize.height = v; });
+    const exactBox = el('div', { class: 'resize-inputs' },
+      exactW, el('span', { class: 'resize-sep', text: '×' }), exactH,
+      el('span', { class: 'resize-unit', text: 'px (will crop to match)' }));
+
+    const upscaleRow = checkboxRow('Allow upscale (default off)',
+      () => !!state.resize.upscale, (v) => { state.resize.upscale = v; });
+    upscaleRow.classList.add('resize-upscale-row');
+
+    const previewLine = el('div', { class: 'resize-preview', hidden: true });
+
+    // -- Rotate / flip row
+    const rotateSeg = segmentedRow('Rotation', [
+      { label: '0°', value: 0 },
+      { label: '90°', value: 90 },
+      { label: '180°', value: 180 },
+      { label: '270°', value: 270 },
+    ], (v) => state.rotate === v, (v) => { state.rotate = v; });
+
+    const flipHRow = checkboxRow('Flip horizontal',
+      () => !!state.flip.horizontal, (v) => { state.flip.horizontal = v; });
+    const flipVRow = checkboxRow('Flip vertical',
+      () => !!state.flip.vertical, (v) => { state.flip.vertical = v; });
+
+    // -- Crop row
+    const cropSel = el('select', {
+      onchange: () => {
+        state.crop.aspect = cropSel.value;
+        // Choosing an aspect ratio replaces any manual pixel box.
+        if (state.crop.box) state.crop.box = null;
+        changed();
+      },
+    });
+    for (const [value, label] of [
+      ['none', 'None'], ['1:1', '1:1 (square)'], ['4:3', '4:3'],
+      ['3:2', '3:2'], ['16:9', '16:9'], ['custom', 'Custom…'],
+    ]) {
+      cropSel.appendChild(el('option', { value, selected: state.crop.aspect === value, text: label }));
+    }
+    const cropW = numInput({ min: 1, placeholder: 'W' }, () => state.crop.customW, (v) => { state.crop.customW = v; });
+    const cropH = numInput({ min: 1, placeholder: 'H' }, () => state.crop.customH, (v) => { state.crop.customH = v; });
+    const cropCustomBox = el('div', { class: 'crop-custom-inputs' },
+      cropW, el('span', { class: 'resize-sep', text: ':' }), cropH);
+
+    // Manual pixel crop — per-file only (needs one concrete image), so it
+    // renders only in drawer instances where previewEntry is provided.
+    let cropBtn = null, cropBoxReadout = null, cropClearBtn = null, cropManualRow = null;
+    if (previewEntry) {
+      const canPreview = !['psd', 'heif', 'tiff', 'bmp', 'pdf'].includes(previewEntry.kind);
+      cropBtn = el('button', {
+        type: 'button', class: 'btn btn-secondary btn-sm', text: 'Crop…',
+        disabled: !canPreview,
+        title: canPreview ? 'Draw a crop region on the image'
+          : 'Manual crop needs a format the browser can preview',
+        onclick: () => openCropModal(previewEntry, state, changed),
+      });
+      cropBoxReadout = el('span', { class: 'crop-box-readout' });
+      cropClearBtn = el('button', {
+        type: 'button', class: 'btn-revert', text: 'Clear', hidden: true,
+        onclick: () => { state.crop.box = null; changed(); },
+      });
+      cropManualRow = el('div', { class: 'crop-manual-row' },
+        cropBtn, cropBoxReadout, cropClearBtn);
+    }
+
+    // -- Kernel row
+    const kernelSel = el('select', {
+      class: 'transforms-kernel',
+      onchange: () => { state.kernel = kernelSel.value; changed(); },
+    });
+    for (const [value, label] of [
+      ['lanczos3', 'Lanczos 3 (default)'], ['lanczos2', 'Lanczos 2'],
+      ['mitchell', 'Mitchell'], ['cubic', 'Cubic'],
+      ['nearest', 'Nearest (sharp pixels)'],
+    ]) {
+      kernelSel.appendChild(el('option', { value, selected: state.kernel === value, text: label }));
+    }
+
+    // -- State-dependent visibility + derived text
+    function sync() {
+      maxBox.hidden = state.resize.mode !== 'max';
+      pctBox.hidden = state.resize.mode !== 'percentage';
+      exactBox.hidden = state.resize.mode !== 'exact';
+      upscaleRow.hidden = !(state.resize.mode === 'max' || state.resize.mode === 'percentage');
+      kernelSel.disabled = state.resize.mode === 'none';
+      const box = state.crop.box && state.crop.box.width > 0 ? state.crop.box : null;
+      // Manual box and aspect crop are mutually exclusive, but the aspect
+      // controls stay enabled — picking an aspect clears the box (see the
+      // cropSel handler) rather than greying out and looking dead. The
+      // select mirrors state because applying a box resets aspect to none.
+      cropSel.value = state.crop.aspect;
+      cropCustomBox.hidden = state.crop.aspect !== 'custom';
+      if (cropBtn) {
+        cropBtn.textContent = box ? 'Edit crop region…' : 'Open crop overlay…';
+        cropBoxReadout.textContent = box
+          ? `${box.width}×${box.height}px @ (${box.left}, ${box.top})` : '';
+        cropClearBtn.hidden = !box;
+      }
+      const preview = computeResizePreview(state, previewEntry);
+      if (preview) {
+        previewLine.textContent = '→ ' + preview
+          + (previewEntry ? '' : ' (preview from first file)');
+        previewLine.hidden = false;
+      } else {
+        previewLine.hidden = true;
+      }
+    }
+    sync();
+
+    container.append(
+      el('div', { class: 'transforms-row' },
+        el('div', { class: 'field-label', text: 'Resize' }),
+        resizeSeg, maxBox, pctBox, exactBox, upscaleRow, previewLine),
+      el('div', { class: 'transforms-row' },
+        el('div', { class: 'field-label', text: 'Rotate & flip' }),
+        rotateSeg,
+        el('div', { class: 'flip-row' }, flipHRow, flipVRow)),
+      el('div', { class: 'transforms-row' },
+        el('div', { class: 'field-label', text: previewEntry ? 'Crop' : 'Crop to aspect' }),
+        el('div', { class: 'transforms-aspect-row' }, cropSel, cropCustomBox),
+        cropManualRow),
+      el('div', { class: 'transforms-row' },
+        el('div', { class: 'field-label', text: 'Resample kernel' }),
+        kernelSel),
+    );
+
+    return { sync };
+  }
+
   (function initTransformsUI() {
     const toggleBtn = document.getElementById('transforms-toggle');
     const body = document.getElementById('transforms-body');
     const badge = document.getElementById('transforms-badge');
     const resetBtn = document.getElementById('transforms-reset');
 
-    const resizeBtnRow = document.getElementById('resize-mode-buttons');
-    const resizeMaxW = document.getElementById('resize-max-w');
-    const resizeMaxH = document.getElementById('resize-max-h');
-    const resizePct = document.getElementById('resize-pct');
-    const resizeExactW = document.getElementById('resize-exact-w');
-    const resizeExactH = document.getElementById('resize-exact-h');
-    const resizeUpscale = document.getElementById('resize-upscale');
-    const resizeUpscaleRow = document.getElementById('resize-upscale-row');
-    const resizePreview = document.getElementById('resize-preview');
+    let panel = null;
 
-    const rotateBtnRow = document.getElementById('rotate-buttons');
-    const flipH = document.getElementById('flip-horizontal');
-    const flipV = document.getElementById('flip-vertical');
-
-    const cropAspectSel = document.getElementById('crop-aspect');
-    const cropCustomBox = document.getElementById('crop-custom-inputs');
-    const cropCustomW = document.getElementById('crop-custom-w');
-    const cropCustomH = document.getElementById('crop-custom-h');
-
-    const kernelSel = document.getElementById('resample-kernel');
+    function renderGlobalTransforms() {
+      panel = buildTransformsPanel(body, transformsState, {
+        onChange: refreshTransformsUI,
+      });
+    }
 
     // -- Collapsible body
     toggleBtn.addEventListener('click', () => {
@@ -2814,118 +3649,17 @@
       toggleBtn.setAttribute('aria-expanded', String(!open));
     });
 
-    // -- Mode segmented buttons
-    function setActiveSegmented(row, value, dataAttr) {
-      row.querySelectorAll('.transforms-seg-btn').forEach((b) => {
-        const isActive = b.dataset[dataAttr] === String(value);
-        b.classList.toggle('active', isActive);
-        b.setAttribute('aria-checked', String(isActive));
-      });
-    }
+    // Replace the global transforms state wholesale and re-render the panel.
+    // Used by Reset and by preset recall.
+    window.setGlobalTransformsState = function (next) {
+      transformsState = next;
+      renderGlobalTransforms();
+      refreshTransformsUI();
+    };
 
-    resizeBtnRow.addEventListener('click', (e) => {
-      const btn = e.target.closest('.transforms-seg-btn');
-      if (!btn) return;
-      const mode = btn.dataset.mode;
-      transformsState.resize.mode = mode;
-      setActiveSegmented(resizeBtnRow, mode, 'mode');
-      syncResizeInputs();
-      refreshTransformsUI();
-    });
-
-    rotateBtnRow.addEventListener('click', (e) => {
-      const btn = e.target.closest('.transforms-seg-btn');
-      if (!btn) return;
-      transformsState.rotate = Number(btn.dataset.rotate);
-      setActiveSegmented(rotateBtnRow, transformsState.rotate, 'rotate');
-      refreshTransformsUI();
-    });
-
-    // -- Resize inputs
-    function syncResizeInputs() {
-      document.getElementById('resize-inputs-max').hidden = transformsState.resize.mode !== 'max';
-      document.getElementById('resize-inputs-percentage').hidden = transformsState.resize.mode !== 'percentage';
-      document.getElementById('resize-inputs-exact').hidden = transformsState.resize.mode !== 'exact';
-      resizeUpscaleRow.hidden = !(transformsState.resize.mode === 'max' || transformsState.resize.mode === 'percentage');
-      kernelSel.disabled = transformsState.resize.mode === 'none';
-    }
-    resizeMaxW.addEventListener('input', () => {
-      transformsState.resize.width = Number(resizeMaxW.value) || 0;
-      refreshTransformsUI();
-    });
-    resizeMaxH.addEventListener('input', () => {
-      transformsState.resize.height = Number(resizeMaxH.value) || 0;
-      refreshTransformsUI();
-    });
-    resizePct.addEventListener('input', () => {
-      transformsState.resize.percentage = Number(resizePct.value) || 100;
-      refreshTransformsUI();
-    });
-    resizeExactW.addEventListener('input', () => {
-      transformsState.resize.width = Number(resizeExactW.value) || 0;
-      refreshTransformsUI();
-    });
-    resizeExactH.addEventListener('input', () => {
-      transformsState.resize.height = Number(resizeExactH.value) || 0;
-      refreshTransformsUI();
-    });
-    resizeUpscale.addEventListener('change', () => {
-      transformsState.resize.upscale = resizeUpscale.checked;
-      refreshTransformsUI();
-    });
-
-    // -- Flip
-    flipH.addEventListener('change', () => {
-      transformsState.flip.horizontal = flipH.checked;
-      refreshTransformsUI();
-    });
-    flipV.addEventListener('change', () => {
-      transformsState.flip.vertical = flipV.checked;
-      refreshTransformsUI();
-    });
-
-    // -- Crop
-    cropAspectSel.addEventListener('change', () => {
-      transformsState.crop.aspect = cropAspectSel.value;
-      cropCustomBox.hidden = transformsState.crop.aspect !== 'custom';
-      refreshTransformsUI();
-    });
-    cropCustomW.addEventListener('input', () => {
-      transformsState.crop.customW = Number(cropCustomW.value) || 0;
-      refreshTransformsUI();
-    });
-    cropCustomH.addEventListener('input', () => {
-      transformsState.crop.customH = Number(cropCustomH.value) || 0;
-      refreshTransformsUI();
-    });
-
-    // -- Kernel
-    kernelSel.addEventListener('change', () => {
-      transformsState.kernel = kernelSel.value;
-      refreshTransformsUI();
-    });
-
-    // -- Reset
+    // -- Reset: swap in a fresh defaults object and re-render the panel.
     resetBtn.addEventListener('click', () => {
-      transformsState = TRANSFORMS_DEFAULTS();
-      // Reset all inputs to defaults
-      setActiveSegmented(resizeBtnRow, 'none', 'mode');
-      setActiveSegmented(rotateBtnRow, 0, 'rotate');
-      resizeMaxW.value = '';
-      resizeMaxH.value = '';
-      resizePct.value = '100';
-      resizeExactW.value = '';
-      resizeExactH.value = '';
-      resizeUpscale.checked = false;
-      flipH.checked = false;
-      flipV.checked = false;
-      cropAspectSel.value = 'none';
-      cropCustomBox.hidden = true;
-      cropCustomW.value = '';
-      cropCustomH.value = '';
-      kernelSel.value = 'lanczos3';
-      syncResizeInputs();
-      refreshTransformsUI();
+      setGlobalTransformsState(TRANSFORMS_DEFAULTS());
     });
 
     // Refresh badge + preview + per-row notice from current state.
@@ -2939,19 +3673,12 @@
         badge.hidden = true;
         resetBtn.hidden = true;
       }
-      const preview = computeResizePreview();
-      if (preview) {
-        resizePreview.textContent = '→ ' + preview + ' (preview from first file)';
-        resizePreview.hidden = false;
-      } else {
-        resizePreview.hidden = true;
-      }
+      if (panel) panel.sync(); // preview text depends on files + state
       // Per-row notices may need to mention the active transforms
       if (typeof refreshFileNotices === 'function') refreshFileNotices();
     };
 
-    // Initial sync (no-op state, but makes sure UI matches)
-    syncResizeInputs();
+    renderGlobalTransforms();
     refreshTransformsUI();
   })();
 
