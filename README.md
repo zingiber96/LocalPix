@@ -99,6 +99,9 @@ SVG is a vector format; converting a photo to SVG is a fundamentally different t
 **Does LocalPix send my images anywhere?**
 No. Everything happens on your computer. There's no analytics, no telemetry, no "phone home." You can verify by disconnecting from the internet or watching your firewall — LocalPix will keep working.
 
+The one deliberate exception: clicking **Check for updates** in the footer makes a single anonymous request to
+`https://api.github.com/repos/zingiber96/LocalPix/releases/latest` to compare version numbers. It carries no identifiers and no data about you or your images, it never runs in the background or on launch, and nothing is downloaded — if a newer version exists you get a link to the release page, and that's it. Don't click the button and LocalPix never touches the network.
+
 **Does it work offline?**
 Yes — once installed, you can be completely offline and LocalPix still works.
 

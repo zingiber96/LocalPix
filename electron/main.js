@@ -205,6 +205,20 @@ function createWindow() {
 
   mainWindow.loadURL(`http://127.0.0.1:${serverInfo.port}`);
 
+  // External links — e.g. the release page from the footer's "Check for
+  // updates" — open in the system browser, never inside the app shell. Any
+  // navigation away from the embedded server is likewise blocked/redirected.
+  mainWindow.webContents.setWindowOpenHandler(({ url }) => {
+    if (/^https?:/i.test(url)) shell.openExternal(url);
+    return { action: 'deny' };
+  });
+  mainWindow.webContents.on('will-navigate', (event, url) => {
+    if (!url.startsWith(`http://127.0.0.1:${serverInfo.port}`)) {
+      event.preventDefault();
+      if (/^https?:/i.test(url)) shell.openExternal(url);
+    }
+  });
+
   mainWindow.on('closed', () => {
     mainWindow = null;
   });

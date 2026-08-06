@@ -26,6 +26,7 @@ let outputDir =
   process.env.LOCALCONVERT_OUTPUT_DIR ||
   path.join(__dirname, 'output');
 const DEFAULT_PORT = parseInt(process.env.PORT, 10) || 3000;
+const APP_VERSION = require('./package.json').version;
 
 function getOutputDir() {
   return outputDir;
@@ -635,19 +636,36 @@ function createApp() {
 
   const app = express();
 
-  const upload = multer({
-    storage: multer.memoryStorage(),
-    limits: { fileSize: 100 * 1024 * 1024 },
-    fileFilter: (req, file, cb) => {
-      const ext = path.extname(file.originalname || '').toLowerCase();
-      const mime = (file.mimetype || '').toLowerCase();
-      if (INPUT_MIMES.has(mime) || INPUT_EXTS.has(ext)) {
-        cb(null, true);
-      } else {
-        cb(new Error(`Unsupported file type: ${mime || ext || 'unknown'}`));
-      }
-    },
-  });
+  // Upload size caps. The user's "Max file size" slider travels as a
+  // ?maxBytes= query param (bytes) so the server enforces the same cap the
+  // UI shows; requests without one (slider at "No limit", or older clients)
+  // get only the absolute ceiling. The ceiling exists because uploads buffer
+  // fully in memory (multer.memoryStorage) — a runaway local script must not
+  // be able to grow the process without bound. multer fixes its limits at
+  // construction time, so the middleware is built per request.
+  const UPLOAD_CEILING_BYTES = 2 * 1024 * 1024 * 1024; // 2 GB
+  const uploadFileFilter = (req, file, cb) => {
+    const ext = path.extname(file.originalname || '').toLowerCase();
+    const mime = (file.mimetype || '').toLowerCase();
+    if (INPUT_MIMES.has(mime) || INPUT_EXTS.has(ext)) {
+      cb(null, true);
+    } else {
+      cb(new Error(`Unsupported file type: ${mime || ext || 'unknown'}`));
+    }
+  };
+  function uploadSingle(field) {
+    return (req, res, next) => {
+      const requested = Number.parseInt(req.query.maxBytes, 10);
+      const fileSize = Number.isFinite(requested) && requested > 0
+        ? Math.min(requested, UPLOAD_CEILING_BYTES)
+        : UPLOAD_CEILING_BYTES;
+      multer({
+        storage: multer.memoryStorage(),
+        limits: { fileSize },
+        fileFilter: uploadFileFilter,
+      }).single(field)(req, res, next);
+    };
+  }
 
   app.use(express.static(path.join(__dirname, 'public')));
 
@@ -705,6 +723,9 @@ function createApp() {
   app.get('/api/config', (req, res) => {
     res.json({
       outputDir,
+      // The frontend's manual "Check for updates" compares against this, and
+      // the footer renders it — package.json is the single source of truth.
+      version: APP_VERSION,
       // No way to tell from inside the server alone, but the Electron host
       // sets this env var when it embeds us. The frontend uses this to decide
       // whether to show the "Change…" button.
@@ -714,7 +735,7 @@ function createApp() {
 
   // Lightweight PDF probe — returns the page count so the frontend can cap
   // its page picker and iterate "All pages" conversions client-side.
-  app.post('/api/pdf-info', convertLimiter, upload.single('image'), async (req, res) => {
+  app.post('/api/pdf-info', convertLimiter, uploadSingle('image'), async (req, res) => {
     if (!req.file) {
       return res.status(400).json({ error: 'No file uploaded.' });
     }
@@ -729,7 +750,7 @@ function createApp() {
     }
   });
 
-  app.post('/api/convert', convertLimiter, upload.single('image'), async (req, res) => {
+  app.post('/api/convert', convertLimiter, uploadSingle('image'), async (req, res) => {
     if (!req.file) {
       return res.status(400).json({ error: 'No file uploaded.' });
     }
@@ -850,8 +871,10 @@ function createApp() {
   // into structured responses the frontend can display inline.
   app.use((err, req, res, next) => {
     if (res.headersSent) return next(err);
-    const status = err && err.code === 'LIMIT_FILE_SIZE' ? 413 : 400;
-    res.status(status).json({ error: err.message || 'Upload error' });
+    if (err && err.code === 'LIMIT_FILE_SIZE') {
+      return res.status(413).json({ error: 'File exceeds the max file size limit.' });
+    }
+    res.status(400).json({ error: err.message || 'Upload error' });
   });
 
   return app;
