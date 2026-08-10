@@ -21,7 +21,8 @@ Convert between JPEG, PNG, WebP, AVIF, JPEG XL, GIF, TIFF, BMP and ICO — witho
 - **It's free and open source.** Use it for personal or commercial work; no subscriptions, no watermarks.
 - **It's fast.** Native image processing — typical conversions are done in milliseconds.
 - **It supports the formats you actually have.** Read 11 common formats including iPhone HEIC, Photoshop PSD, SVG, and PDF. Write 9, including modern ones like AVIF and JPEG XL.
-- **It handles batches.** Drop a whole folder, convert everything at once. Per-format quality controls, privacy controls, custom output folder.
+- **It handles batches.** Drop a whole folder, convert everything at once. Per-format quality controls, privacy controls, a max-file-size cap, custom output folder.
+- **Updates on your terms.** A manual **Check for updates** button in the footer — one anonymous version check when you click it, never in the background.
 
 ## Download
 
@@ -63,6 +64,12 @@ Intel Macs and Windows ARM aren't in the default release but can be built from s
 4. **Click Convert** on a file row or **Convert All** for a batch.
 
 Converted files land in `~/Documents/LocalPix/` by default. Click **Change…** next to the output folder to pick somewhere else; LocalPix remembers your choice between launches.
+
+**Max file size** — the slider under the drop zone caps how large a file can be added (default **250 MB**, up to 2 GB or no limit). Files are held in memory while they convert, so a cap keeps one giant file from slowing down or freezing the app on machines with less RAM; anything over the cap is skipped at drop time. Hover the **?** next to the label for the short version.
+
+## Checking for updates
+
+LocalPix never checks for updates on its own — that would be a network call you didn't ask for. Instead, click **Check for updates** in the footer whenever you like. It fetches the latest release number from GitHub (anonymously — see the FAQ), compares it with the version you're running, and links you to the download page if there's something newer. Nothing is downloaded or installed automatically.
 
 ## Supported formats
 
