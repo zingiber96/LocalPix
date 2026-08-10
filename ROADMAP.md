@@ -35,6 +35,18 @@ Legend: ✅ shipped · 🔨 in progress · 📋 planned · ⏸️ deferred/block
 - "Apply to all" button
 - "Open folder" button in the output row
 
+### v1.4.2 — Update check + guardrails
+- **Manual update check** — footer button, one anonymous GET to the GitHub
+  Releases API, user-initiated only (no background checks, no identifiers);
+  documented in the README FAQ
+- **Max file size control** — slider (10 MB → 2 GB → no limit, default
+  250 MB) with a "?" explainer, replacing the old hard-coded 100 MB cap;
+  enforced client-side at file-add and server-side via `?maxBytes=` (2 GB
+  absolute ceiling protects the in-memory upload buffer)
+- Dependency security sweep — all 18 Dependabot alerts closed (sharp 0.35.3
+  with the WebP byte-identical guarantee re-verified; electron-builder
+  26.15.3; `npm audit` clean)
+
 > Threaded through these: the WEBPConvert → LocalConvert → LocalPix rebrand,
 > the redesigned UI, app icons, user-selectable output folder, and dark mode —
 > none on the original feature roadmap, all shipped.
@@ -59,13 +71,6 @@ Theme: complete, granular control over every conversion.
 - 📋 Per-format animation options (loop, FPS, frame skip)
 - 📋 Frame extraction (animated → series of stills)
 - 📋 In-row animation preview
-- 🔨 **Manual update check** — footer button, one anonymous GET to the GitHub
-  Releases API, user-initiated only (no background checks, no identifiers);
-  documented in the README FAQ
-- 🔨 **Max file size control** — slider (10 MB → 2 GB → no limit, default
-  250 MB) with a "?" explainer, replacing the old hard-coded 100 MB cap;
-  enforced client-side at file-add and server-side via `?maxBytes=` (2 GB
-  absolute ceiling protects the in-memory upload buffer)
 
 ### v1.6 — Smart choices
 - 📋 Live quality preview with size estimate
@@ -105,7 +110,7 @@ Theme: complete, granular control over every conversion.
 | CI smoke workflow | ✅ done (v1.2.0) |
 | README hero screenshot | ✅ done |
 | Code signing + notarization (removes Gatekeeper/SmartScreen warnings) | 📋 pending — currently ad-hoc signed (`identity: "-"`) |
-| `electron-updater` auto-update | ⏸️ deferred — manual update check (v1.5) covers notification; full auto-update is blocked on macOS by ad-hoc signing (Squirrel.Mac requires a Developer ID cert), i.e. on the code-signing row above |
+| `electron-updater` auto-update | ⏸️ deferred — manual update check (v1.4.2) covers notification; full auto-update is blocked on macOS by ad-hoc signing (Squirrel.Mac requires a Developer ID cert), i.e. on the code-signing row above |
 | Submit to `awesome-*` lists (public-launch task) | 📋 not started |
 | macOS Intel + Windows ARM builds | 📋 available via scripts, not in the default release set |
 
@@ -123,7 +128,7 @@ Theme: complete, granular control over every conversion.
   built via the `el()` / `svgEl()` helpers (closed a class of CodeQL XSS
   alerts; don't reintroduce the sink).
 - **Local-only** — server binds to `127.0.0.1`; no external calls, no
-  telemetry. The whole value proposition. Single carve-out (v1.5): the
+  telemetry. The whole value proposition. Single carve-out (v1.4.2): the
   footer's user-initiated "Check for updates" makes one anonymous GET to the
   GitHub Releases API — never automatic, never carrying data. Any future
   network touch must meet that same bar and be documented in the README FAQ.
