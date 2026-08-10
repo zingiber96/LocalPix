@@ -727,6 +727,57 @@
       flex-shrink: 0;
     }
 
+    /* Small "?" bubble with a hover/focus tooltip. A real <button> so
+       keyboard users can tab to it; the tip is pure CSS (no JS). */
+    .help-bubble {
+      position: relative;
+      width: 15px;
+      height: 15px;
+      padding: 0;
+      flex: none;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      border: 1px solid var(--border-strong);
+      border-radius: 50%;
+      background: var(--surface-2);
+      color: var(--text-muted);
+      font-size: 10px;
+      font-weight: 700;
+      line-height: 1;
+      cursor: help;
+    }
+    .help-bubble:hover,
+    .help-bubble:focus-visible {
+      color: var(--text);
+      border-color: var(--accent);
+    }
+    .help-tip {
+      position: absolute;
+      bottom: calc(100% + 8px);
+      left: 50%;
+      transform: translateX(-50%);
+      width: 250px;
+      padding: 8px 10px;
+      background: var(--surface);
+      color: var(--text);
+      border: 1px solid var(--border-strong);
+      border-radius: var(--radius-sm);
+      box-shadow: 0 4px 14px rgba(0, 0, 0, 0.18);
+      font-size: 11px;
+      font-weight: 400;
+      text-transform: none;
+      letter-spacing: normal;
+      line-height: 1.5;
+      text-align: left;
+      display: none;
+      z-index: 30;
+    }
+    .help-bubble:hover .help-tip,
+    .help-bubble:focus .help-tip {
+      display: block;
+    }
+
     #output-folder-path {
       flex: 1;
       min-width: 200px;
@@ -1099,6 +1150,24 @@
       margin-top: 10px;
     }
 
+    /* The manual update check lives in the footer: a plain-text button so it
+       reads as part of the tagline, not a call to action. */
+    .footer-link {
+      background: none;
+      border: none;
+      padding: 0;
+      font: inherit;
+      color: var(--text-muted);
+      text-decoration: underline;
+      cursor: pointer;
+    }
+    .footer-link:hover { color: var(--text); }
+    .footer-link:disabled { cursor: default; opacity: 0.6; text-decoration: none; }
+    #update-check-result a {
+      color: var(--accent);
+      font-weight: 600;
+    }
+
     /* --- Responsive narrow -------------------------------------------- */
 
     @media (max-width: 720px) {
@@ -1436,6 +1505,19 @@
     </div>
     <input type="file" id="file-input" multiple
       accept=".jpg,.jpeg,.png,.webp,.avif,.gif,.heic,.heif,.heics,.heifs,.tif,.tiff,.bmp,.svg,.psd,.pdf,application/pdf,image/*" />
+
+    <!-- Max file size (v1.5). Uploads buffer fully in server memory, so huge
+         files can stall modest machines — the slider caps what gets accepted.
+         Default 250 MB; rightmost stop = "No limit". Enforced on file add
+         (before any upload) and again server-side via ?maxBytes=. -->
+    <div class="output-row" style="margin-top:12px;">
+      <span class="output-label">Max file size</span>
+      <button type="button" class="help-bubble" aria-label="Why limit file size?">?<span class="help-tip" role="tooltip">Files are held in memory while they convert, so one very large file can slow down or freeze the app on machines with less RAM. Anything over the cap is skipped at drop time. Raise the cap — up to 2&nbsp;GB, or no limit — if you work with bigger files.</span></button>
+      <input type="range" id="max-file-size" min="0" max="8" step="1" value="4"
+        style="flex:1; max-width:220px;" aria-label="Maximum file size"
+        aria-describedby="max-file-size-value" />
+      <span class="slider-value" id="max-file-size-value" style="min-width:4.5rem;">250 MB</span>
+    </div>
   </section>
 
   <!-- Format + Options ------------------------------------------------- -->
@@ -1613,7 +1695,8 @@
   </section>
 
   <footer class="app-footer">
-    LocalPix · v1.4.1 · offline image converter
+    LocalPix · <span id="footer-version">v1.4.1</span> · offline image converter ·
+    <button class="footer-link" id="update-check-btn" type="button">Check for updates</button><span id="update-check-result" aria-live="polite"></span>
   </footer>
 
 </div>
@@ -1785,7 +1868,7 @@
     try {
       const fd = new FormData();
       fd.append('image', entry.file);
-      const resp = await fetch('/api/pdf-info', { method: 'POST', body: fd });
+      const resp = await fetch(uploadUrl('/api/pdf-info'), { method: 'POST', body: fd });
       const data = await resp.json();
       if (resp.ok && data.pageCount > 0) {
         entry.pdfPages = data.pageCount;
@@ -1844,6 +1927,55 @@
       input.dispatchEvent(new Event('input')); // persist via the handler above
     });
   });
+
+  // --- Max file size cap (v1.5) ---------------------------------------------
+  // Discrete slider stops; default 250 MB, rightmost is "No limit". Files over
+  // the cap are rejected at add time — before any upload — and the cap also
+  // travels to the server as ?maxBytes= so it's enforced there too.
+  // Persisted like the filename template (localStorage in both modes).
+  const MAX_SIZE_STOPS_MB = [10, 25, 50, 100, 250, 500, 1024, 2048, Infinity];
+  const MAX_SIZE_DEFAULT_IDX = 4; // 250 MB — keep in sync with the HTML value
+  const maxSizeSlider  = document.getElementById('max-file-size');
+  const maxSizeValueEl = document.getElementById('max-file-size-value');
+
+  function maxFileBytes() {
+    const mb = MAX_SIZE_STOPS_MB[Number(maxSizeSlider.value)] ?? Infinity;
+    return mb === Infinity ? Infinity : mb * 1024 * 1024;
+  }
+  function maxFileSizeLabel() {
+    const mb = MAX_SIZE_STOPS_MB[Number(maxSizeSlider.value)] ?? Infinity;
+    if (mb === Infinity) return 'No limit';
+    return mb >= 1024 ? `${mb / 1024} GB` : `${mb} MB`;
+  }
+  (function initMaxFileSize() {
+    try {
+      const raw = localStorage.getItem('localpix-max-file-size-idx');
+      const idx = raw === null ? NaN : Number(raw);
+      if (Number.isInteger(idx) && idx >= 0 && idx < MAX_SIZE_STOPS_MB.length) {
+        maxSizeSlider.value = String(idx);
+      }
+    } catch (e) { /* private mode etc. */ }
+    maxSizeValueEl.textContent = maxFileSizeLabel();
+    maxSizeSlider.addEventListener('input', () => {
+      maxSizeValueEl.textContent = maxFileSizeLabel();
+      try {
+        const idx = Number(maxSizeSlider.value);
+        // At the default — store nothing rather than a sentinel.
+        if (idx === MAX_SIZE_DEFAULT_IDX) {
+          localStorage.removeItem('localpix-max-file-size-idx');
+        } else {
+          localStorage.setItem('localpix-max-file-size-idx', String(idx));
+        }
+      } catch (e) { /* private mode etc. */ }
+    });
+  })();
+
+  // Upload endpoint URL carrying the current cap; bare URL when uncapped so
+  // untouched setups keep the exact request shape of previous releases.
+  function uploadUrl(base) {
+    const cap = maxFileBytes();
+    return cap === Infinity ? base : `${base}?maxBytes=${cap}`;
+  }
 
   // --- Format selector ------------------------------------------------------
   function setTargetFormat(fmt) {
@@ -2107,17 +2239,26 @@
   function addFiles(newFiles) {
     const accepted = [];
     const rejected = [];
+    const oversized = [];
+    const capBytes = maxFileBytes();
     for (const f of newFiles) {
       const kind = detectSourceKind(f);
       if (kind === 'unknown') rejected.push(f.name);
+      else if (f.size > capBytes) oversized.push(f.name);
       else accepted.push({ file: f, kind });
     }
+    const skippedList = (names) =>
+      names.slice(0, 5).join('\n') +
+      (names.length > 5 ? `\n…and ${names.length - 5} more` : '');
+    const skipMsgs = [];
     if (rejected.length) {
-      alert(
-        `${rejected.length} file(s) skipped (unsupported type):\n` +
-        rejected.slice(0, 5).join('\n') +
-        (rejected.length > 5 ? `\n…and ${rejected.length - 5} more` : '')
-      );
+      skipMsgs.push(`${rejected.length} file(s) skipped (unsupported type):\n` + skippedList(rejected));
+    }
+    if (oversized.length) {
+      skipMsgs.push(`${oversized.length} file(s) skipped (over the ${maxFileSizeLabel()} max file size):\n` + skippedList(oversized));
+    }
+    if (skipMsgs.length) {
+      alert(skipMsgs.join('\n\n'));
     }
     for (const { file, kind } of accepted) {
       const id = nextId++;
@@ -2532,7 +2673,7 @@
   }
 
   async function postConvert(formData) {
-    const resp = await fetch('/api/convert', { method: 'POST', body: formData });
+    const resp = await fetch(uploadUrl('/api/convert'), { method: 'POST', body: formData });
     const data = await resp.json();
     if (!resp.ok) throw new Error(data.error || 'Conversion failed');
     return data;
@@ -2846,6 +2987,10 @@
   const openFolderBtn     = document.getElementById('open-folder-btn');
   const changeFolderBtn   = document.getElementById('change-folder-btn');
 
+  // Running app version, from /api/config (package.json is the source of
+  // truth). Null until the config fetch lands — the update check handles that.
+  let appVersion = null;
+
   function setOutputFolderDisplay(path) {
     outputFolderPathEl.textContent = path || '(unknown)';
     outputFolderPathEl.title = path || '';
@@ -2856,6 +3001,10 @@
       const resp = await fetch('/api/config');
       const cfg = await resp.json();
       setOutputFolderDisplay(cfg.outputDir);
+      if (cfg.version) {
+        appVersion = cfg.version;
+        document.getElementById('footer-version').textContent = 'v' + cfg.version;
+      }
       if (window.localpix && cfg.electron) {
         openFolderBtn.style.display   = '';
         changeFolderBtn.style.display = '';
@@ -2885,6 +3034,59 @@
       window.localpix.onOutputFolderChanged?.((p) => setOutputFolderDisplay(p));
     }
   })();
+
+  // -- Update check (v1.5) ----------------------------------------------------
+  // Manual and user-initiated ONLY. Clicking the footer button makes one
+  // anonymous GET to the GitHub Releases API — no identifiers, no payload,
+  // never in the background. This is the only network request LocalPix can
+  // make, and it never happens unless the user asks. Documented in README
+  // ("Does it phone home?"); keep that answer in sync with this code.
+  const UPDATE_API_URL = 'https://api.github.com/repos/zingiber96/LocalPix/releases/latest';
+  const updateCheckBtn  = document.getElementById('update-check-btn');
+  const updateResultEl  = document.getElementById('update-check-result');
+
+  function isNewerVersion(remote, local) {
+    const parse = (v) => String(v || '').replace(/^v/, '').split('.').map((n) => parseInt(n, 10) || 0);
+    const a = parse(remote);
+    const b = parse(local);
+    for (let i = 0; i < Math.max(a.length, b.length); i++) {
+      if ((a[i] || 0) !== (b[i] || 0)) return (a[i] || 0) > (b[i] || 0);
+    }
+    return false;
+  }
+
+  updateCheckBtn.addEventListener('click', async () => {
+    updateCheckBtn.disabled = true;
+    updateResultEl.textContent = ' Checking…';
+    try {
+      const resp = await fetch(UPDATE_API_URL, {
+        headers: { Accept: 'application/vnd.github+json' },
+      });
+      if (!resp.ok) throw new Error(`GitHub responded ${resp.status}`);
+      const rel = await resp.json();
+      const latest = String(rel.tag_name || '');
+      updateResultEl.textContent = ' ';
+      if (!latest) {
+        updateResultEl.textContent = ' No releases found.';
+      } else if (appVersion && !isNewerVersion(latest, appVersion)) {
+        updateResultEl.textContent = ' Up to date ✓';
+      } else {
+        // Newer than us — or we don't know our own version (static preview):
+        // either way, link the release page. Opens in the system browser in
+        // the desktop app (see setWindowOpenHandler in electron/main.js).
+        updateResultEl.appendChild(el('a', {
+          href: rel.html_url || 'https://github.com/zingiber96/LocalPix/releases',
+          target: '_blank',
+          rel: 'noopener noreferrer',
+          text: `${latest} available — download`,
+        }));
+      }
+    } catch (e) {
+      updateResultEl.textContent = ' Check failed — are you online?';
+    } finally {
+      updateCheckBtn.disabled = false;
+    }
+  });
 
   // -- Privacy / metadata toggles -------------------------------------------
   // "Preserve color profile" only makes sense when "Strip metadata" is on —

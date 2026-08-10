@@ -5,6 +5,43 @@ All notable changes to LocalPix will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project loosely follows [Semantic Versioning](https://semver.org/).
 
+## [Unreleased] — v1.5
+
+### Added
+
+- **Manual update check.** A "Check for updates" button in the footer
+  makes one anonymous, user-initiated request to the GitHub Releases API
+  and compares version numbers — no identifiers, no background checks,
+  no downloads. If a newer version exists you get a link to the release
+  page (opened in your system browser from the desktop app). This is the
+  only network request LocalPix can make, and only when you click.
+  Documented in the README FAQ.
+- **Max file size control.** A slider above the file list caps how large
+  an added file may be (10 MB up to 2 GB, or **No limit**), with a ?
+  bubble explaining why a cap protects low-RAM machines. The default is
+  **250 MB**, replacing the previous fixed 100 MB cap. Oversized files are
+  skipped at drop time with a notice, and the cap is enforced
+  server-side too. The choice persists between sessions.
+
+### Changed
+
+- Uploads now have a 2 GB absolute ceiling (previously a fixed 100 MB),
+  since files buffer in memory during conversion.
+- The footer version number is now read from the app itself rather than
+  hard-coded in the page.
+
+### Security
+
+- **Dependencies.** Closed all 18 open Dependabot alerts: `sharp`
+  0.33.5 → 0.35.3 (high — inherited libvips CVEs; WebP byte-identical
+  output re-verified across the bump), `electron-builder` 26.8.1 →
+  26.15.3 (high — `app-builder-lib` AppImage search-path and
+  `builder-util-runtime` credential-leak advisories, plus its `undici`/
+  `brace-expansion` transitive alerts; build-time only, never shipped in
+  the packaged app), and `npm audit fix` bumps for `ip-address` (SSRF
+  misclassification) and `body-parser` (DoS). `npm audit`: 0
+  vulnerabilities.
+
 ## [1.4.1] — 2026-07-08 "Full Control"
 
 ### Added

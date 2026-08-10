@@ -21,7 +21,8 @@ Convert between JPEG, PNG, WebP, AVIF, JPEG XL, GIF, TIFF, BMP and ICO — witho
 - **It's free and open source.** Use it for personal or commercial work; no subscriptions, no watermarks.
 - **It's fast.** Native image processing — typical conversions are done in milliseconds.
 - **It supports the formats you actually have.** Read 11 common formats including iPhone HEIC, Photoshop PSD, SVG, and PDF. Write 9, including modern ones like AVIF and JPEG XL.
-- **It handles batches.** Drop a whole folder, convert everything at once. Per-format quality controls, privacy controls, custom output folder.
+- **It handles batches.** Drop a whole folder, convert everything at once. Per-format quality controls, privacy controls, a max-file-size cap, custom output folder.
+- **Updates on your terms.** A manual **Check for updates** button in the footer — one anonymous version check when you click it, never in the background.
 
 ## Download
 
@@ -64,6 +65,12 @@ Intel Macs and Windows ARM aren't in the default release but can be built from s
 
 Converted files land in `~/Documents/LocalPix/` by default. Click **Change…** next to the output folder to pick somewhere else; LocalPix remembers your choice between launches.
 
+**Max file size** — the slider under the drop zone caps how large a file can be added (default **250 MB**, up to 2 GB or no limit). Files are held in memory while they convert, so a cap keeps one giant file from slowing down or freezing the app on machines with less RAM; anything over the cap is skipped at drop time. Hover the **?** next to the label for the short version.
+
+## Checking for updates
+
+LocalPix never checks for updates on its own — that would be a network call you didn't ask for. Instead, click **Check for updates** in the footer whenever you like. It fetches the latest release number from GitHub (anonymously — see the FAQ), compares it with the version you're running, and links you to the download page if there's something newer. Nothing is downloaded or installed automatically.
+
 ## Supported formats
 
 ### Inputs (formats LocalPix can read)
@@ -98,6 +105,9 @@ SVG is a vector format; converting a photo to SVG is a fundamentally different t
 
 **Does LocalPix send my images anywhere?**
 No. Everything happens on your computer. There's no analytics, no telemetry, no "phone home." You can verify by disconnecting from the internet or watching your firewall — LocalPix will keep working.
+
+The one deliberate exception: clicking **Check for updates** in the footer makes a single anonymous request to
+`https://api.github.com/repos/zingiber96/LocalPix/releases/latest` to compare version numbers. It carries no identifiers and no data about you or your images, it never runs in the background or on launch, and nothing is downloaded — if a newer version exists you get a link to the release page, and that's it. Don't click the button and LocalPix never touches the network.
 
 **Does it work offline?**
 Yes — once installed, you can be completely offline and LocalPix still works.

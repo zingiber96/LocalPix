@@ -54,11 +54,18 @@ Theme: complete, granular control over every conversion.
 - 📋 **Manual crop overlay** — drag-to-crop on the thumbnail, per file
 - Release prep
 
-### v1.5 — Animation
+### v1.5 — Animation (next)
 - 📋 Animated GIF/WebP/AVIF round-trip (currently flattened to first frame)
 - 📋 Per-format animation options (loop, FPS, frame skip)
 - 📋 Frame extraction (animated → series of stills)
 - 📋 In-row animation preview
+- 🔨 **Manual update check** — footer button, one anonymous GET to the GitHub
+  Releases API, user-initiated only (no background checks, no identifiers);
+  documented in the README FAQ
+- 🔨 **Max file size control** — slider (10 MB → 2 GB → no limit, default
+  250 MB) with a "?" explainer, replacing the old hard-coded 100 MB cap;
+  enforced client-side at file-add and server-side via `?maxBytes=` (2 GB
+  absolute ceiling protects the in-memory upload buffer)
 
 ### v1.6 — Smart choices
 - 📋 Live quality preview with size estimate
@@ -98,7 +105,7 @@ Theme: complete, granular control over every conversion.
 | CI smoke workflow | ✅ done (v1.2.0) |
 | README hero screenshot | ✅ done |
 | Code signing + notarization (removes Gatekeeper/SmartScreen warnings) | 📋 pending — currently ad-hoc signed (`identity: "-"`) |
-| `electron-updater` auto-update | 📋 pending |
+| `electron-updater` auto-update | ⏸️ deferred — manual update check (v1.5) covers notification; full auto-update is blocked on macOS by ad-hoc signing (Squirrel.Mac requires a Developer ID cert), i.e. on the code-signing row above |
 | Submit to `awesome-*` lists (public-launch task) | 📋 not started |
 | macOS Intel + Windows ARM builds | 📋 available via scripts, not in the default release set |
 
@@ -116,7 +123,10 @@ Theme: complete, granular control over every conversion.
   built via the `el()` / `svgEl()` helpers (closed a class of CodeQL XSS
   alerts; don't reintroduce the sink).
 - **Local-only** — server binds to `127.0.0.1`; no external calls, no
-  telemetry. The whole value proposition.
+  telemetry. The whole value proposition. Single carve-out (v1.5): the
+  footer's user-initiated "Check for updates" makes one anonymous GET to the
+  GitHub Releases API — never automatic, never carrying data. Any future
+  network touch must meet that same bar and be documented in the README FAQ.
 - **Hybrid decode** — `sharp` owns the hot path (and the byte-identical
   guarantee depends on it); `lib/magick.js` owns everything else. Adding a
   format is ideally one `ENCODERS` entry + one `FORMAT_OPTIONS` entry.
