@@ -1508,15 +1508,15 @@
 
     <!-- Max file size (v1.5). Uploads buffer fully in server memory, so huge
          files can stall modest machines — the slider caps what gets accepted.
-         Default 1 GB; rightmost stop = "No limit". Enforced on file add
+         Default 250 MB; rightmost stop = "No limit". Enforced on file add
          (before any upload) and again server-side via ?maxBytes=. -->
     <div class="output-row" style="margin-top:12px;">
       <span class="output-label">Max file size</span>
       <button type="button" class="help-bubble" aria-label="Why limit file size?">?<span class="help-tip" role="tooltip">Files are held in memory while they convert, so one very large file can slow down or freeze the app on machines with less RAM. Anything over the cap is skipped at drop time. Raise the cap — up to 2&nbsp;GB, or no limit — if you work with bigger files.</span></button>
-      <input type="range" id="max-file-size" min="0" max="8" step="1" value="6"
+      <input type="range" id="max-file-size" min="0" max="8" step="1" value="4"
         style="flex:1; max-width:220px;" aria-label="Maximum file size"
         aria-describedby="max-file-size-value" />
-      <span class="slider-value" id="max-file-size-value" style="min-width:4.5rem;">1 GB</span>
+      <span class="slider-value" id="max-file-size-value" style="min-width:4.5rem;">250 MB</span>
     </div>
   </section>
 
@@ -1929,12 +1929,12 @@
   });
 
   // --- Max file size cap (v1.5) ---------------------------------------------
-  // Discrete slider stops; default 1 GB, rightmost is "No limit". Files over
+  // Discrete slider stops; default 250 MB, rightmost is "No limit". Files over
   // the cap are rejected at add time — before any upload — and the cap also
   // travels to the server as ?maxBytes= so it's enforced there too.
   // Persisted like the filename template (localStorage in both modes).
   const MAX_SIZE_STOPS_MB = [10, 25, 50, 100, 250, 500, 1024, 2048, Infinity];
-  const MAX_SIZE_DEFAULT_IDX = 6; // 1 GB — keep in sync with the HTML value
+  const MAX_SIZE_DEFAULT_IDX = 4; // 250 MB — keep in sync with the HTML value
   const maxSizeSlider  = document.getElementById('max-file-size');
   const maxSizeValueEl = document.getElementById('max-file-size-value');
 

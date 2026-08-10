@@ -22,11 +22,11 @@
     "express-rate-limit": "^8.5.2",
     "multer": "^2.1.1",
     "mupdf": "^1.27.0",
-    "sharp": "^0.33.0"
+    "sharp": "^0.35.3"
   },
   "devDependencies": {
     "electron": "^42.0.0",
-    "electron-builder": "^26.0.0"
+    "electron-builder": "^26.15.3"
   },
   "overrides": {
     "picomatch": "^4.0.4"
