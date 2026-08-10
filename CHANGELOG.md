@@ -17,10 +17,11 @@ and this project loosely follows [Semantic Versioning](https://semver.org/).
   only network request LocalPix can make, and only when you click.
   Documented in the README FAQ.
 - **Max file size control.** A slider above the file list caps how large
-  an added file may be (10 MB up to 2 GB, or **No limit** — the default,
-  replacing the previous fixed 100 MB cap). Oversized files are skipped
-  at drop time with a notice, and the cap is enforced server-side too.
-  The choice persists between sessions.
+  an added file may be (10 MB up to 2 GB, or **No limit**), with a ?
+  bubble explaining why a cap protects low-RAM machines. The default is
+  **1 GB**, replacing the previous fixed 100 MB cap. Oversized files are
+  skipped at drop time with a notice, and the cap is enforced
+  server-side too. The choice persists between sessions.
 
 ### Changed
 

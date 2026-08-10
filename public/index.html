@@ -727,6 +727,57 @@
       flex-shrink: 0;
     }
 
+    /* Small "?" bubble with a hover/focus tooltip. A real <button> so
+       keyboard users can tab to it; the tip is pure CSS (no JS). */
+    .help-bubble {
+      position: relative;
+      width: 15px;
+      height: 15px;
+      padding: 0;
+      flex: none;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      border: 1px solid var(--border-strong);
+      border-radius: 50%;
+      background: var(--surface-2);
+      color: var(--text-muted);
+      font-size: 10px;
+      font-weight: 700;
+      line-height: 1;
+      cursor: help;
+    }
+    .help-bubble:hover,
+    .help-bubble:focus-visible {
+      color: var(--text);
+      border-color: var(--accent);
+    }
+    .help-tip {
+      position: absolute;
+      bottom: calc(100% + 8px);
+      left: 50%;
+      transform: translateX(-50%);
+      width: 250px;
+      padding: 8px 10px;
+      background: var(--surface);
+      color: var(--text);
+      border: 1px solid var(--border-strong);
+      border-radius: var(--radius-sm);
+      box-shadow: 0 4px 14px rgba(0, 0, 0, 0.18);
+      font-size: 11px;
+      font-weight: 400;
+      text-transform: none;
+      letter-spacing: normal;
+      line-height: 1.5;
+      text-align: left;
+      display: none;
+      z-index: 30;
+    }
+    .help-bubble:hover .help-tip,
+    .help-bubble:focus .help-tip {
+      display: block;
+    }
+
     #output-folder-path {
       flex: 1;
       min-width: 200px;
@@ -1456,15 +1507,16 @@
       accept=".jpg,.jpeg,.png,.webp,.avif,.gif,.heic,.heif,.heics,.heifs,.tif,.tiff,.bmp,.svg,.psd,.pdf,application/pdf,image/*" />
 
     <!-- Max file size (v1.5). Uploads buffer fully in server memory, so huge
-         files can stall modest machines — the slider lets users opt into a
-         cap. Rightmost stop = "No limit" (the default). Enforced on file add
+         files can stall modest machines — the slider caps what gets accepted.
+         Default 1 GB; rightmost stop = "No limit". Enforced on file add
          (before any upload) and again server-side via ?maxBytes=. -->
     <div class="output-row" style="margin-top:12px;">
       <span class="output-label">Max file size</span>
-      <input type="range" id="max-file-size" min="0" max="8" step="1" value="8"
+      <button type="button" class="help-bubble" aria-label="Why limit file size?">?<span class="help-tip" role="tooltip">Files are held in memory while they convert, so one very large file can slow down or freeze the app on machines with less RAM. Anything over the cap is skipped at drop time. Raise the cap — up to 2&nbsp;GB, or no limit — if you work with bigger files.</span></button>
+      <input type="range" id="max-file-size" min="0" max="8" step="1" value="6"
         style="flex:1; max-width:220px;" aria-label="Maximum file size"
         aria-describedby="max-file-size-value" />
-      <span class="slider-value" id="max-file-size-value" style="min-width:4.5rem;">No limit</span>
+      <span class="slider-value" id="max-file-size-value" style="min-width:4.5rem;">1 GB</span>
     </div>
   </section>
 
@@ -1877,11 +1929,12 @@
   });
 
   // --- Max file size cap (v1.5) ---------------------------------------------
-  // Discrete slider stops; the rightmost is "No limit" (the default). Files
-  // over the cap are rejected at add time — before any upload — and the cap
-  // also travels to the server as ?maxBytes= so it's enforced there too.
+  // Discrete slider stops; default 1 GB, rightmost is "No limit". Files over
+  // the cap are rejected at add time — before any upload — and the cap also
+  // travels to the server as ?maxBytes= so it's enforced there too.
   // Persisted like the filename template (localStorage in both modes).
   const MAX_SIZE_STOPS_MB = [10, 25, 50, 100, 250, 500, 1024, 2048, Infinity];
+  const MAX_SIZE_DEFAULT_IDX = 6; // 1 GB — keep in sync with the HTML value
   const maxSizeSlider  = document.getElementById('max-file-size');
   const maxSizeValueEl = document.getElementById('max-file-size-value');
 
@@ -1907,8 +1960,8 @@
       maxSizeValueEl.textContent = maxFileSizeLabel();
       try {
         const idx = Number(maxSizeSlider.value);
-        // "No limit" is the default — store nothing rather than a sentinel.
-        if (idx === MAX_SIZE_STOPS_MB.length - 1) {
+        // At the default — store nothing rather than a sentinel.
+        if (idx === MAX_SIZE_DEFAULT_IDX) {
           localStorage.removeItem('localpix-max-file-size-idx');
         } else {
           localStorage.setItem('localpix-max-file-size-idx', String(idx));

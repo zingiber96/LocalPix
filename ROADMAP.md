@@ -62,10 +62,10 @@ Theme: complete, granular control over every conversion.
 - 🔨 **Manual update check** — footer button, one anonymous GET to the GitHub
   Releases API, user-initiated only (no background checks, no identifiers);
   documented in the README FAQ
-- 🔨 **Max file size control** — slider (10 MB → 2 GB → no limit, default no
-  limit) replacing the old hard-coded 100 MB cap; enforced client-side at
-  file-add and server-side via `?maxBytes=` (2 GB absolute ceiling protects
-  the in-memory upload buffer)
+- 🔨 **Max file size control** — slider (10 MB → 2 GB → no limit, default
+  1 GB) with a "?" explainer, replacing the old hard-coded 100 MB cap;
+  enforced client-side at file-add and server-side via `?maxBytes=` (2 GB
+  absolute ceiling protects the in-memory upload buffer)
 
 ### v1.6 — Smart choices
 - 📋 Live quality preview with size estimate
