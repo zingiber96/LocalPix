@@ -35,6 +35,16 @@ Legend: ✅ shipped · 🔨 in progress · 📋 planned · ⏸️ deferred/block
 - "Apply to all" button
 - "Open folder" button in the output row
 
+### v1.4.0 / v1.4.1 — "Full Control"
+Theme: complete, granular control over every conversion.
+- **PDF input** (`mupdf`, fully offline, per-page selection + convert-all)
+- **Filename templates** (`{name}` `{format}` `{width}` `{height}` `{date}` `{n}`)
+- **Presets** (save / recall / delete named settings, persisted)
+- **Per-file transforms editing** — the per-file drawer hosts a fully
+  editable transforms panel bound to that file's override
+- **Manual crop overlay** — drag-to-crop editor with aspect-ratio locks
+- v1.4.1 folded in the CodeQL filename-template fixes + a Dependabot sweep
+
 ### v1.4.2 — Update check + guardrails
 - **Manual update check** — footer button, one anonymous GET to the GitHub
   Releases API, user-initiated only (no background checks, no identifiers);
@@ -54,17 +64,6 @@ Legend: ✅ shipped · 🔨 in progress · 📋 planned · ⏸️ deferred/block
 ---
 
 ## Planned
-
-### v1.4 — "Full Control" (next; clears the deferred backlog)
-Theme: complete, granular control over every conversion.
-- 📋 **PDF input** (`mupdf` — gated and proven to render full-res pages in Node)
-- 📋 **Filename templates** (`{name}` `{format}` `{date}` `{width}` `{height}`)
-- 📋 **Presets** (save / recall / delete named settings, persisted)
-- 📋 **Per-file transforms editing** — generalize the transforms UI to bind to
-  any state (the way `renderField` already does for options); make the
-  per-file drawer's transforms editable instead of read-only
-- 📋 **Manual crop overlay** — drag-to-crop on the thumbnail, per file
-- Release prep
 
 ### v1.5 — Animation (next)
 - 📋 Animated GIF/WebP/AVIF round-trip (currently flattened to first frame)
