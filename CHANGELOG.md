@@ -5,6 +5,24 @@ All notable changes to LocalPix will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project loosely follows [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Added
+
+- **JPEG 2000 input + output.** Read `.jp2`/`.j2k`/`.jpf`/`.jpx`, and
+  save as JPEG 2000 with a quality slider (100 = lossless). Decoded and
+  encoded fully offline via magick-wasm, like JPEG XL.
+- **OpenEXR input + output.** Read and write `.exr` HDR images. EXR
+  input is tone-mapped to standard range when converting to SDR
+  formats (a per-file notice says so).
+
+### Notes
+
+- RAW camera input (DNG/NEF/ARW…) was re-evaluated for this release and
+  stays deferred: `libraw-wasm` remains browser-only (upstream's own
+  tests run it in Chromium, not Node), and the native-addon
+  alternative requires a system LibRaw install. Details in ROADMAP.md.
+
 ## [1.4.2] — 2026-08-10
 
 ### Added
