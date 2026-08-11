@@ -16,6 +16,28 @@ and this project loosely follows [Semantic Versioning](https://semver.org/).
   input is tone-mapped to standard range when converting to SDR
   formats (a per-file notice says so).
 
+- **Package-manager manifests.** A new `packaging/` folder holds a
+  Homebrew cask and a winget manifest set, so installs and updates can
+  flow through `brew`/`winget` with the app itself making zero network
+  calls. See `packaging/README.md` for the one-time publish steps.
+
+### Fixed
+
+- **Manual crops on EXIF-rotated photos.** Browsers show previews
+  auto-oriented, but the conversion pipeline received the stored,
+  unrotated pixels — so a crop drawn on a portrait iPhone photo could
+  land in the wrong place. The pipeline now bakes the EXIF orientation
+  in whenever transforms are active (the default no-transform convert
+  is untouched, preserving the WebP byte-identical guarantee).
+
+### Internal
+
+- **Committed regression suite.** `npm test` (test/run.cjs) boots the
+  real server and checks 21 invariants — the WebP byte-identical
+  guarantee against a committed reference pair, all 11 output formats,
+  JP2/EXR round-trips, the upload cap, filename templates, manual
+  crop, and EXIF crop parity. CI runs it on every PR.
+
 ### Notes
 
 - RAW camera input (DNG/NEF/ARW…) was re-evaluated for this release and
