@@ -226,10 +226,26 @@ async function applyTransforms(pipeline, t) {
   let curW = meta0.width || 0;
   let curH = meta0.height || 0;
 
+  // 0) EXIF auto-orient. Browsers display previews auto-oriented, so every
+  //    coordinate the user produced against them (a manual crop box, the
+  //    expected rotate/resize geometry) lives in ORIENTED space — but the
+  //    decoder hands us the stored, unrotated pixels. Bake the orientation
+  //    in first so server geometry matches the preview the user drew on.
+  //    Runs only inside a transforms payload, so the default convert path
+  //    (and the WebP byte-identical guarantee) is untouched. autoOrient()
+  //    is a distinct sharp operation from rotate(), so it composes with the
+  //    explicit 90° rotate in step 2.
+  if ((meta0.orientation || 1) !== 1) {
+    p = p.autoOrient();
+    // Orientations 5-8 encode a 90°/270° rotation — logical dims swap.
+    if (meta0.orientation >= 5) [curW, curH] = [curH, curW];
+  }
+
   // 1) Explicit pixel crop (the manual crop overlay). The box is expressed
-  //    in ORIGINAL source pixels — what the user drew on the un-rotated
-  //    preview — so it's applied before any orientation change. When a box
-  //    is present the aspect-ratio crop below is skipped.
+  //    in the pixel space of the preview the user drew on — which browsers
+  //    render auto-oriented — so it's applied after the EXIF bake above and
+  //    before the user's own rotate/flip. When a box is present the
+  //    aspect-ratio crop below is skipped.
   const explicitBox = parseExplicitCropBox(t.crop);
   if (explicitBox && curW && curH) {
     const c = clampCropBox(explicitBox, curW, curH);
