@@ -57,6 +57,18 @@ Theme: complete, granular control over every conversion.
   with the WebP byte-identical guarantee re-verified; electron-builder
   26.15.3; `npm audit` clean)
 
+### v1.4.3 — Deferred backlog
+- **JPEG 2000 + OpenEXR** input and output (magick-wasm; EXR tone-mapped
+  for SDR targets)
+- **EXIF auto-orient** inside the transforms pipeline, so manual crops on
+  rotated photos land correctly (default convert path untouched)
+- **Committed regression suite** — `npm test`, 21 checks, in CI
+- **Homebrew cask + winget manifests** in `packaging/`
+- Dependency security sweep — 37 Dependabot alerts closed (critical
+  `proxy-addr` via express 4.22.3; multer 2.5.0; sharp 0.35.5 with the
+  WebP byte-identical guarantee re-verified; electron 42.11.18;
+  `npm audit` clean)
+
 > Threaded through these: the WEBPConvert → LocalConvert → LocalPix rebrand,
 > the redesigned UI, app icons, user-selectable output folder, and dark mode —
 > none on the original feature roadmap, all shipped.
@@ -96,8 +108,6 @@ Theme: complete, granular control over every conversion.
 | Item | Status | Reason |
 |---|---|---|
 | **RAW input** (DNG/NEF/CR2/ARW…) | ⏸️ blocked (re-gated 2026-08-11) | magick-wasm only extracts the embedded preview thumbnail. `libraw-wasm` 1.6 remains web-only — built for `web,worker` with pthreads/SharedArrayBuffer; upstream's own integration tests run it in headless Chromium because it cannot run in Node. `lightdrift-libraw` (native addon) is alpha and links a system LibRaw (`-lraw`, no prebuilds, no vendored sources) — unshippable as a self-contained app. Remaining viable path: decode client-side in the browser/renderer (where libraw-wasm works; needs COOP/COEP for SharedArrayBuffer) and hand pixels to the server — an architecture change worth its own release decision. |
-| **JPEG 2000** (`.jp2`) | ⏸️ easy, deprioritized | Works via magick-wasm (decode + encode confirmed). ~1 dispatch entry whenever wanted. |
-| **OpenEXR** (`.exr`) | ⏸️ easy, deprioritized | Same as JP2 — magick-wasm handles it; cheap to add. |
 
 ---
 

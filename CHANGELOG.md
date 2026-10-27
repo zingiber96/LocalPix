@@ -5,7 +5,7 @@ All notable changes to LocalPix will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project loosely follows [Semantic Versioning](https://semver.org/).
 
-## [Unreleased]
+## [1.4.3] — 2026-10-27
 
 ### Added
 
@@ -15,7 +15,6 @@ and this project loosely follows [Semantic Versioning](https://semver.org/).
 - **OpenEXR input + output.** Read and write `.exr` HDR images. EXR
   input is tone-mapped to standard range when converting to SDR
   formats (a per-file notice says so).
-
 - **Package-manager manifests.** A new `packaging/` folder holds a
   Homebrew cask and a winget manifest set, so installs and updates can
   flow through `brew`/`winget` with the app itself making zero network
@@ -29,6 +28,18 @@ and this project loosely follows [Semantic Versioning](https://semver.org/).
   land in the wrong place. The pipeline now bakes the EXIF orientation
   in whenever transforms are active (the default no-transform convert
   is untouched, preserving the WebP byte-identical guarantee).
+
+### Security
+
+- **Dependencies.** Closed the 37 patchable open Dependabot alerts
+  (1 critical, 20 high): `express` 4.22.3 (pulls `proxy-addr` 2.0.8 —
+  critical — and `qs` 6.16.2), `multer` 2.5.0, `sharp` 0.35.5 (WebP
+  byte-identical output re-verified), `express-rate-limit` 8.7.1
+  (`ip-address` 10.7.5), and the build-time-only `electron` 42.11.18 and
+  `electron-builder` 26.18.0 (fixed `js-yaml`, `@xmldom/xmldom`,
+  `fast-uri`, `brace-expansion`, `undici` transitives). The remaining
+  `sprintf-js` alert has no fix and its advisory was withdrawn.
+  `npm audit`: 0 vulnerabilities.
 
 ### Internal
 
