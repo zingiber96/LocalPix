@@ -1,0 +1,27 @@
+PackageIdentifier: LocalPix.LocalPix
+PackageVersion: 1.4.2
+PackageLocale: en-US
+Publisher: James Folsom
+PublisherUrl: https://github.com/zingiber96
+PublisherSupportUrl: https://github.com/zingiber96/LocalPix/issues
+PackageName: LocalPix
+PackageUrl: https://github.com/zingiber96/LocalPix
+License: MIT
+LicenseUrl: https://github.com/zingiber96/LocalPix/blob/main/LICENSE
+ShortDescription: Free, offline image converter — nothing leaves your machine
+Description: |-
+  LocalPix converts images between 13 input and 11 output formats
+  (JPEG, PNG, WebP, AVIF, JPEG XL, JPEG 2000, OpenEXR, GIF, TIFF, BMP,
+  ICO, plus HEIC/PSD/SVG/PDF input) entirely on your computer. No
+  uploads, no account, no telemetry. Batch conversion, per-file
+  overrides, transforms (resize, rotate, crop), metadata stripping,
+  filename templates, and presets.
+Tags:
+  - image
+  - converter
+  - webp
+  - avif
+  - offline
+  - privacy
+ManifestType: defaultLocale
+ManifestVersion: 1.6.0

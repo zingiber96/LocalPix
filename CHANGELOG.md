@@ -5,6 +5,46 @@ All notable changes to LocalPix will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project loosely follows [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Added
+
+- **JPEG 2000 input + output.** Read `.jp2`/`.j2k`/`.jpf`/`.jpx`, and
+  save as JPEG 2000 with a quality slider (100 = lossless). Decoded and
+  encoded fully offline via magick-wasm, like JPEG XL.
+- **OpenEXR input + output.** Read and write `.exr` HDR images. EXR
+  input is tone-mapped to standard range when converting to SDR
+  formats (a per-file notice says so).
+
+- **Package-manager manifests.** A new `packaging/` folder holds a
+  Homebrew cask and a winget manifest set, so installs and updates can
+  flow through `brew`/`winget` with the app itself making zero network
+  calls. See `packaging/README.md` for the one-time publish steps.
+
+### Fixed
+
+- **Manual crops on EXIF-rotated photos.** Browsers show previews
+  auto-oriented, but the conversion pipeline received the stored,
+  unrotated pixels — so a crop drawn on a portrait iPhone photo could
+  land in the wrong place. The pipeline now bakes the EXIF orientation
+  in whenever transforms are active (the default no-transform convert
+  is untouched, preserving the WebP byte-identical guarantee).
+
+### Internal
+
+- **Committed regression suite.** `npm test` (test/run.cjs) boots the
+  real server and checks 21 invariants — the WebP byte-identical
+  guarantee against a committed reference pair, all 11 output formats,
+  JP2/EXR round-trips, the upload cap, filename templates, manual
+  crop, and EXIF crop parity. CI runs it on every PR.
+
+### Notes
+
+- RAW camera input (DNG/NEF/ARW…) was re-evaluated for this release and
+  stays deferred: `libraw-wasm` remains browser-only (upstream's own
+  tests run it in Chromium, not Node), and the native-addon
+  alternative requires a system LibRaw install. Details in ROADMAP.md.
+
 ## [1.4.2] — 2026-08-10
 
 ### Added

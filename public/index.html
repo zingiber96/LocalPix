@@ -1497,14 +1497,14 @@
         <em>Drop images</em> here, or <em>click to browse</em>
       </div>
       <div class="drop-formats">
-        JPEG · PNG · WebP · AVIF · GIF · HEIF/HEIC · TIFF · BMP · SVG · PSD · PDF
+        JPEG · PNG · WebP · AVIF · GIF · HEIF/HEIC · TIFF · BMP · SVG · PSD · PDF · JPEG 2000 · EXR
       </div>
       <div class="drop-privacy">
         Everything stays on your machine.
       </div>
     </div>
     <input type="file" id="file-input" multiple
-      accept=".jpg,.jpeg,.png,.webp,.avif,.gif,.heic,.heif,.heics,.heifs,.tif,.tiff,.bmp,.svg,.psd,.pdf,application/pdf,image/*" />
+      accept=".jpg,.jpeg,.png,.webp,.avif,.gif,.heic,.heif,.heics,.heifs,.tif,.tiff,.bmp,.svg,.psd,.pdf,.jxl,.jp2,.j2k,.jpf,.jpx,.exr,application/pdf,image/*" />
 
     <!-- Max file size (v1.5). Uploads buffer fully in server memory, so huge
          files can stall modest machines — the slider caps what gets accepted.
@@ -1541,7 +1541,9 @@
         <button type="button" class="format-btn" data-format="gif"  role="radio">GIF</button>
         <button type="button" class="format-btn" data-format="ico"  role="radio">ICO</button>
         <button type="button" class="format-btn" data-format="jpeg" role="radio">JPEG</button>
+        <button type="button" class="format-btn" data-format="jp2"  role="radio">JPEG 2000</button>
         <button type="button" class="format-btn" data-format="jxl"  role="radio">JPEG XL</button>
+        <button type="button" class="format-btn" data-format="exr"  role="radio">OpenEXR</button>
         <button type="button" class="format-btn" data-format="png"  role="radio">PNG</button>
         <button type="button" class="format-btn" data-format="tiff" role="radio">TIFF</button>
         <button type="button" class="format-btn active" data-format="webp" role="radio" aria-checked="true">WebP</button>
@@ -1556,7 +1558,9 @@
       <option value="gif">GIF</option>
       <option value="ico">ICO</option>
       <option value="jpeg">JPEG</option>
+      <option value="jp2">JPEG 2000</option>
       <option value="jxl">JPEG XL</option>
+      <option value="exr">OpenEXR</option>
       <option value="png">PNG</option>
       <option value="tiff">TIFF</option>
       <option value="webp" selected>WebP</option>
@@ -1785,6 +1789,19 @@
       hint: 'BMP is uncompressed; expect large file sizes.',
       fields: [],
     },
+    jp2: {
+      label: 'JPEG 2000',
+      description: 'Archival · medical/GIS imaging · wavelet compression',
+      fields: [
+        { key: 'quality', type: 'slider', min: 1, max: 100, def: 80, label: 'Quality (100 = lossless)' },
+      ],
+    },
+    exr: {
+      label: 'OpenEXR',
+      description: 'HDR interchange · VFX/render pipelines · large files',
+      hint: 'EXR stores high-dynamic-range data; files are large by design.',
+      fields: [],
+    },
     ico: {
       label: 'ICO',
       description: 'Windows icon bundle · multi-resolution',
@@ -1811,13 +1828,16 @@
     if (ext === '.webp' || m === 'image/webp') return 'webp';
     if (ext === '.avif' || m === 'image/avif') return 'avif';
     if (ext === '.jxl' || m === 'image/jxl') return 'jxl';
+    if (['.jp2', '.j2k', '.jpf', '.jpx'].includes(ext) ||
+        ['image/jp2', 'image/jpx', 'image/jpm'].includes(m)) return 'jp2';
+    if (ext === '.exr' || ['image/x-exr', 'image/exr', 'image/aces'].includes(m)) return 'exr';
     if (['.tif', '.tiff'].includes(ext) || m === 'image/tiff') return 'tiff';
     if (['.jpg', '.jpeg'].includes(ext) || m === 'image/jpeg' || m === 'image/jpg') return 'jpeg';
     return 'unknown';
   }
 
   const SOURCE_KINDS_WITH_POSSIBLE_ALPHA = new Set(
-    ['png', 'webp', 'gif', 'svg', 'tiff', 'psd', 'heif', 'avif', 'jxl']
+    ['png', 'webp', 'gif', 'svg', 'tiff', 'psd', 'heif', 'avif', 'jxl', 'jp2', 'exr']
   );
 
   // Per-file state. id -> { file, kind, rowEl, state, naturalW, naturalH }.
@@ -2337,7 +2357,7 @@
 
     // Browsers can't render PSD / HEIF / PDF natively in an <img> → show a
     // labelled placeholder.
-    const browserSupportsThumb = !['psd', 'heif', 'tiff', 'bmp', 'pdf'].includes(kind);
+    const browserSupportsThumb = !['psd', 'heif', 'tiff', 'bmp', 'pdf', 'jp2', 'exr'].includes(kind);
     if (!browserSupportsThumb) {
       const placeholder = document.createElement('div');
       placeholder.className = 'thumb-placeholder';
@@ -2387,6 +2407,9 @@
       }
       if (kind === 'pdf') {
         notices.push('PDF input: a single page is rendered (choose it with “PDF page to convert” above).');
+      }
+      if (kind === 'exr' && effective.targetFormat !== 'exr') {
+        notices.push('EXR input is high-dynamic-range; it will be tone-mapped to standard range for this output format.');
       }
       if ((kind === 'gif' || kind === 'webp') && effective.targetFormat !== kind) {
         notices.push('Animated sources are flattened to the first frame in v1.');
@@ -2538,10 +2561,11 @@
     }
 
     // -- Format selector
-    const FORMATS = ['avif', 'bmp', 'gif', 'ico', 'jpeg', 'jxl', 'png', 'tiff', 'webp'];
+    const FORMATS = ['avif', 'bmp', 'gif', 'ico', 'jpeg', 'jp2', 'jxl', 'exr', 'png', 'tiff', 'webp'];
     const FMT_LABELS = {
       avif: 'AVIF', bmp: 'BMP', gif: 'GIF', ico: 'ICO',
-      jpeg: 'JPEG', jxl: 'JPEG XL', png: 'PNG', tiff: 'TIFF', webp: 'WebP',
+      jpeg: 'JPEG', jp2: 'JPEG 2000', jxl: 'JPEG XL', exr: 'OpenEXR',
+      png: 'PNG', tiff: 'TIFF', webp: 'WebP',
     };
     const formatMini = el('div', { class: 'file-format-mini', role: 'radiogroup',
       'aria-label': 'Output format for this file' });
@@ -3749,7 +3773,7 @@
     // renders only in drawer instances where previewEntry is provided.
     let cropBtn = null, cropBoxReadout = null, cropClearBtn = null, cropManualRow = null;
     if (previewEntry) {
-      const canPreview = !['psd', 'heif', 'tiff', 'bmp', 'pdf'].includes(previewEntry.kind);
+      const canPreview = !['psd', 'heif', 'tiff', 'bmp', 'pdf', 'jp2', 'exr'].includes(previewEntry.kind);
       cropBtn = el('button', {
         type: 'button', class: 'btn btn-secondary btn-sm', text: 'Crop…',
         disabled: !canPreview,

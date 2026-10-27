@@ -7,9 +7,10 @@
 #
 # Intentionally NOT here (in scope for the release workflow instead):
 #   - Building packaged macOS / Windows artifacts — that's release.yml's job
-#   - Heavy integration tests against fixture images — would need binary
-#     test assets committed; defer until we have a tests/ folder worth the
-#     bytes.
+#
+# The regression suite (test/run.cjs) DOES run here: it boots the real
+# server and checks conversion invariants against committed fixtures,
+# including the WebP byte-identical guarantee.
 #
 # Runs on Linux (cheapest runner minutes) since this is just a code-shape
 # check. Sharp's @img/sharp-linux-x64 native binding is fetched automatically
@@ -69,3 +70,9 @@ jobs:
         run: |
           node -e "require('./server.js'); console.log('server.js OK')"
           node -e "require('./lib/magick.js'); console.log('lib/magick.js OK')"
+
+      - name: Regression suite
+        # test/run.cjs boots the real server on an ephemeral port and checks
+        # the invariants that have bitten us before — most importantly the
+        # WebP byte-identical guarantee against a committed reference pair.
+        run: npm test

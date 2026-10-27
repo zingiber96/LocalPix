@@ -95,7 +95,7 @@ Theme: complete, granular control over every conversion.
 
 | Item | Status | Reason |
 |---|---|---|
-| **RAW input** (DNG/NEF/CR2/ARW…) | ⏸️ blocked | magick-wasm only extracts the embedded preview thumbnail; `libraw-wasm` is browser-only and won't run cleanly server-side. Needs either client-side decode (architecture change) or a Node-native decoder. LibRaw the C library decodes DNG fine — the blocker is *where it can run*, not capability. |
+| **RAW input** (DNG/NEF/CR2/ARW…) | ⏸️ blocked (re-gated 2026-08-11) | magick-wasm only extracts the embedded preview thumbnail. `libraw-wasm` 1.6 remains web-only — built for `web,worker` with pthreads/SharedArrayBuffer; upstream's own integration tests run it in headless Chromium because it cannot run in Node. `lightdrift-libraw` (native addon) is alpha and links a system LibRaw (`-lraw`, no prebuilds, no vendored sources) — unshippable as a self-contained app. Remaining viable path: decode client-side in the browser/renderer (where libraw-wasm works; needs COOP/COEP for SharedArrayBuffer) and hand pixels to the server — an architecture change worth its own release decision. |
 | **JPEG 2000** (`.jp2`) | ⏸️ easy, deprioritized | Works via magick-wasm (decode + encode confirmed). ~1 dispatch entry whenever wanted. |
 | **OpenEXR** (`.exr`) | ⏸️ easy, deprioritized | Same as JP2 — magick-wasm handles it; cheap to add. |
 

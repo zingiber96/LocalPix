@@ -74,6 +74,8 @@ const INPUT_MIMES = new Set([
   'image/vnd.adobe.photoshop', 'application/x-photoshop',
   'application/photoshop', 'application/psd', 'image/x-photoshop',
   'image/jxl',
+  'image/jp2', 'image/jpx', 'image/jpm',
+  'image/x-exr', 'image/exr', 'image/aces',
   'application/pdf',
   // Note: RAW camera formats (NEF/CR2/DNG/ARW/etc.) were investigated for
   // v1.2 — magick-wasm "accepts" them but only extracts the tiny embedded
@@ -86,6 +88,8 @@ const INPUT_EXTS = new Set([
   '.heic', '.heif', '.heics', '.heifs',
   '.tif', '.tiff', '.bmp', '.svg', '.psd',
   '.jxl', '.pdf',
+  '.jp2', '.j2k', '.jpf', '.jpx',
+  '.exr',
 ]);
 
 // -- Small helpers ------------------------------------------------------------
@@ -105,7 +109,7 @@ function parseHexColor(s) {
 
 // detectSourceKind: which decoder path do we take?
 // Returns one of: jpeg, png, webp, avif, gif, heif, tiff, bmp, svg, psd, jxl,
-// pdf, unknown.
+// jp2, exr, pdf, unknown.
 function detectSourceKind(file) {
   const ext = path.extname(file.originalname || '').toLowerCase();
   const mime = (file.mimetype || '').toLowerCase();
@@ -123,6 +127,9 @@ function detectSourceKind(file) {
   if (ext === '.webp' || mime === 'image/webp') return 'webp';
   if (ext === '.avif' || mime === 'image/avif') return 'avif';
   if (ext === '.jxl' || mime === 'image/jxl') return 'jxl';
+  if (['.jp2', '.j2k', '.jpf', '.jpx'].includes(ext) ||
+      ['image/jp2', 'image/jpx', 'image/jpm'].includes(mime)) return 'jp2';
+  if (ext === '.exr' || ['image/x-exr', 'image/exr', 'image/aces'].includes(mime)) return 'exr';
   if (['.tif', '.tiff'].includes(ext) || mime === 'image/tiff') return 'tiff';
   if (['.jpg', '.jpeg'].includes(ext) || mime === 'image/jpeg' || mime === 'image/jpg') return 'jpeg';
   return 'unknown';
@@ -219,10 +226,26 @@ async function applyTransforms(pipeline, t) {
   let curW = meta0.width || 0;
   let curH = meta0.height || 0;
 
+  // 0) EXIF auto-orient. Browsers display previews auto-oriented, so every
+  //    coordinate the user produced against them (a manual crop box, the
+  //    expected rotate/resize geometry) lives in ORIENTED space — but the
+  //    decoder hands us the stored, unrotated pixels. Bake the orientation
+  //    in first so server geometry matches the preview the user drew on.
+  //    Runs only inside a transforms payload, so the default convert path
+  //    (and the WebP byte-identical guarantee) is untouched. autoOrient()
+  //    is a distinct sharp operation from rotate(), so it composes with the
+  //    explicit 90° rotate in step 2.
+  if ((meta0.orientation || 1) !== 1) {
+    p = p.autoOrient();
+    // Orientations 5-8 encode a 90°/270° rotation — logical dims swap.
+    if (meta0.orientation >= 5) [curW, curH] = [curH, curW];
+  }
+
   // 1) Explicit pixel crop (the manual crop overlay). The box is expressed
-  //    in ORIGINAL source pixels — what the user drew on the un-rotated
-  //    preview — so it's applied before any orientation change. When a box
-  //    is present the aspect-ratio crop below is skipped.
+  //    in the pixel space of the preview the user drew on — which browsers
+  //    render auto-oriented — so it's applied after the EXIF bake above and
+  //    before the user's own rotate/flip. When a box is present the
+  //    aspect-ratio crop below is skipped.
   const explicitBox = parseExplicitCropBox(t.crop);
   if (explicitBox && curW && curH) {
     const c = clampCropBox(explicitBox, curW, curH);
@@ -549,6 +572,44 @@ const ENCODERS = {
         { width: info.width, height: info.height, data },
         'jxl',
         { quality, defines: { effort: String(effort) } },
+      );
+    },
+  },
+
+  jp2: {
+    ext: 'jp2',
+    async encode(pipeline, opts, ctx) {
+      // JPEG 2000 — sharp's prebuilt libvips doesn't include OpenJPEG, so
+      // encode via magick-wasm like JXL/BMP. Quality maps to magick's
+      // rate-control; 100 switches the encoder to reversible (lossless).
+      const quality = clamp(opts.quality, 1, 100, 80);
+      const { data, info } = await pipeline
+        .ensureAlpha()
+        .raw()
+        .toBuffer({ resolveWithObject: true });
+      if (ctx) ctx.outDims = { width: info.width, height: info.height };
+      return magick.encodeFromRawRgba(
+        { width: info.width, height: info.height, data },
+        'jp2',
+        { quality },
+      );
+    },
+  },
+
+  exr: {
+    ext: 'exr',
+    async encode(pipeline, opts, ctx) {
+      // OpenEXR — HDR interchange format (VFX/render pipelines). No lossy
+      // quality knob exposed; magick writes half-float scanlines with ZIP
+      // compression by default. Encoded via magick-wasm (not in libvips).
+      const { data, info } = await pipeline
+        .ensureAlpha()
+        .raw()
+        .toBuffer({ resolveWithObject: true });
+      if (ctx) ctx.outDims = { width: info.width, height: info.height };
+      return magick.encodeFromRawRgba(
+        { width: info.width, height: info.height, data },
+        'exr',
       );
     },
   },

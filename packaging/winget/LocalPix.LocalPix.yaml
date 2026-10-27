@@ -1,0 +1,9 @@
+# winget version manifest for LocalPix — one of the three files the
+# microsoft/winget-pkgs submission wants under
+#   manifests/l/LocalPix/LocalPix/1.4.2/
+# See packaging/README.md for the submission steps.
+PackageIdentifier: LocalPix.LocalPix
+PackageVersion: 1.4.2
+DefaultLocale: en-US
+ManifestType: version
+ManifestVersion: 1.6.0

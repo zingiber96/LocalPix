@@ -1,0 +1,9 @@
+PackageIdentifier: LocalPix.LocalPix
+PackageVersion: 1.4.2
+InstallerType: nullsoft
+Installers:
+  - Architecture: x64
+    InstallerUrl: https://github.com/zingiber96/LocalPix/releases/download/v1.4.2/LocalPix.Setup.1.4.2.exe
+    InstallerSha256: 8B3186F5CF444CCBFCEB5E62D11CA69292FA2FBE76650757217770D275E633A7
+ManifestType: installer
+ManifestVersion: 1.6.0

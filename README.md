@@ -3,7 +3,7 @@
 # LocalPix
 
 **A free, offline image converter for macOS and Windows.**
-Convert between JPEG, PNG, WebP, AVIF, JPEG XL, GIF, TIFF, BMP and ICO — without uploading anything.
+Convert between JPEG, PNG, WebP, AVIF, JPEG XL, JPEG 2000, OpenEXR, GIF, TIFF, BMP and ICO — without uploading anything.
 
 [**Download the latest release →**](../../releases/latest)
 
@@ -20,7 +20,7 @@ Convert between JPEG, PNG, WebP, AVIF, JPEG XL, GIF, TIFF, BMP and ICO — witho
 - **It's local.** Your images never leave your computer. No upload, no account, no telemetry.
 - **It's free and open source.** Use it for personal or commercial work; no subscriptions, no watermarks.
 - **It's fast.** Native image processing — typical conversions are done in milliseconds.
-- **It supports the formats you actually have.** Read 11 common formats including iPhone HEIC, Photoshop PSD, SVG, and PDF. Write 9, including modern ones like AVIF and JPEG XL.
+- **It supports the formats you actually have.** Read 13 formats including iPhone HEIC, Photoshop PSD, SVG, PDF, JPEG 2000, and OpenEXR. Write 11, including modern ones like AVIF and JPEG XL.
 - **It handles batches.** Drop a whole folder, convert everything at once. Per-format quality controls, privacy controls, a max-file-size cap, custom output folder.
 - **Updates on your terms.** A manual **Check for updates** button in the footer — one anonymous version check when you click it, never in the background.
 
@@ -75,7 +75,7 @@ LocalPix never checks for updates on its own — that would be a network call yo
 
 ### Inputs (formats LocalPix can read)
 
-JPEG · PNG · WebP · AVIF · GIF · **HEIF/HEIC** · TIFF · BMP · **SVG** · **PSD** · **PDF**
+JPEG · PNG · WebP · AVIF · GIF · **HEIF/HEIC** · TIFF · BMP · **SVG** · **PSD** · **PDF** · **JPEG 2000** · **OpenEXR**
 
 PDF input renders one page per conversion (pick the page with the **PDF page
 to convert** field that appears when a PDF is in the list). Pages are
@@ -83,7 +83,7 @@ rasterised at 192 dpi via [MuPDF](https://mupdf.com/), fully offline.
 
 ### Outputs (formats LocalPix can save as)
 
-JPEG · PNG · WebP · AVIF · **JPEG XL** · GIF · TIFF · BMP · ICO
+JPEG · PNG · WebP · AVIF · **JPEG XL** · **JPEG 2000** · **OpenEXR** · GIF · TIFF · BMP · ICO
 
 ## Privacy controls
 
